@@ -243,11 +243,12 @@ server <- function(input, output, session) {
   # studyIDs.  The user selects a participantID, then a studyID, then a caller, and can 
   # optionally select FileAccess (Open or Controlled - both will be shown if not selected)
   
-  df_manifest <- reactive({
-    if (is.null(input$CCDI_manifest)) {
+  #EDITING this to change the default to be 
+  df_manifest <- reactive({   
+    if (is.null(input$manifest)) {
       manifest_file <- "sbgenomics/project-files/VCF_Table_Viewer_CCDI_manifest.csv"
     } else { 
-      manifest_file <- input$CCDI_manifest$datapath
+      manifest_file <- input$manifest$datapath
     }
     read.csv(manifest_file, header=TRUE, sep=",")
   })
@@ -860,7 +861,7 @@ server <- function(input, output, session) {
   #-----------------------------------------------------------------------------#
   observeEvent(input$createPlot, {
 
-    subjID <- input$subjectID
+    subjID <- input$participantID #changing subjectID to participantID
     print(paste("Generating plot for", subjID, "..."))
 
     x <- inputTable()[input$dataTable_rows_selected, ]
