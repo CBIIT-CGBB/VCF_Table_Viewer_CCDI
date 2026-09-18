@@ -221,7 +221,7 @@ server <- function(input, output, session) {
   #EDITING this to change the default to be 
   df_manifest <- reactive({   
     if (is.null(input$manifest)) {
-      manifest_file <- "sbgenomics/project-files/VCF_Table_Viewer_CCDI_manifest.csv"
+      manifest_file <- "sbgenomics/project-files/VCF_Table_Viewer_CCDI_manifest_all_fields.csv"
     } else { 
       manifest_file <- input$manifest$datapath
     }
@@ -470,15 +470,14 @@ server <- function(input, output, session) {
     newcols <- unlist(strsplit(cols2, "\\|"))
     # print(newcols)
 
-    # print(colnames(my.vcf.df))
-    # rename AF columns
-    if ("AF" %in% colnames(my.vcf.df)) {
-      my.vcf.df <- my.vcf.df |> rename(SAMPLE_AF = AF)
-    }
+    print(colnames(my.vcf.df))
+    # rename AF column
+    my.vcf.df <- my.vcf.df |> dplyr::rename(dplyr::any_of(c(SAMPLE_AF = "AF")))
 
     # if multiple annotations, only take the 1st one (TODO: deal with multiple alleles)
     my.vcf.ANN.df <- my.vcf.df |> separate_wider_delim(CSQ, delim=",", names = c("CSQ"), too_many="drop")
-    my.vcf.ANN.df <- my.vcf.ANN.df |> rename_with(~ paste0(.,"_INFO"), .cols = matches("^SOMATIC"))
+    my.vcf.ANN.df <- my.vcf.ANN.df |> dplyr::rename_with(~ if(length(.x) == 0) character(0) else paste0(.,"_INFO"), 
+                                                           .cols = matches("^SOMATIC"))
     my.vcf.ANN.df <- my.vcf.ANN.df |> separate_wider_delim(CSQ, delim = "|", names = newcols,  
                                                            too_many = "debug", too_few = "debug", 
                                                            names_repair = "universal") # 
@@ -517,13 +516,6 @@ server <- function(input, output, session) {
     }
     my.vcf.ANN.df <- my.vcf.ANN.df |> filter(Consequence %in% mutation_list)
     
-    #### create columns flagging genes of interest
-    for (i in colnames(gene_lists)) {
-      my.vcf.ANN.df[[i]] <- ifelse(my.vcf.ANN.df$SYMBOL %in% gene_lists[[i]] & 
-                                   my.vcf.ANN.df$SYMBOL != '', 'Y', 'N')
-      my.vcf.ANN.df <- my.vcf.ANN.df |> relocate(i, .after=SYMBOL)
-    }
-    
     #### create an index from chr,pos,ref,alt
     my.vcf.ANN.df$index <- paste(my.vcf.ANN.df$CHROM, my.vcf.ANN.df$POS, my.vcf.ANN.df$REF, my.vcf.ANN.df$ALT, sep='.')
     
@@ -555,6 +547,13 @@ server <- function(input, output, session) {
       #relocate(c("REVEL_score"), .after=DANN_score)
     my.vcf.ANN.df <- my.vcf.ANN.df |> relocate(index)
     
+    #### create columns flagging genes of interest
+    for (i in colnames(gene_lists)) {
+      my.vcf.ANN.df[[i]] <- ifelse(my.vcf.ANN.df$SYMBOL %in% gene_lists[[i]] & 
+                                   my.vcf.ANN.df$SYMBOL != '', 'Y', 'N')
+      my.vcf.ANN.df <- my.vcf.ANN.df |> relocate(i, .after=SYMBOL)
+    }
+
     #### make columns numeric  
     # my.vcf.ANN.df <- my.vcf.ANN.df |> mutate(across(c('DANN_score', 'CADD_phred', 'REVEL_score'), \(x) as.numeric(x))) |>  
     #                                    mutate(across(c('DANN_score', 'CADD_phred', 'REVEL_score'), \(x) round(x, 3)))   |>
