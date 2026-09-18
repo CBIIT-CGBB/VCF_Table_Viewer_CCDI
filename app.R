@@ -33,6 +33,39 @@ library(GenomicAlignments)
 #VCFFileName, caller, ParticipantID, SampleID, BAMFileName (optional), StudyID (optional)
 #manifest <- read.csv("sbgenomics/project-files/CCDI_Manifest_Example.csv")
 #manifest <- manifest |> arrange(StudyID, ParticipantID, SampleID)
+#  VCFFileName, caller, ParticipantID, SampleID, BAMFileName (optional), StudyID (optional)
+#  manifest <- read.csv("sbgenomics/project-files/CCDI_Manifest_Example.csv")
+#  manifest <- manifest |> arrange(StudyID, ParticipantID, SampleID)
+# get caller column from file names
+# manifest <- manifest |> mutate(caller = str_select(FileName))
+#  a6a77776-f50a-4630-bdcf-631b7e7e51d0.vardict_somatic.norm.annot.public.vcf.gz
+#  65377817-5b14-4314-a87b-5eb4bae3757c.mutect2_somatic.norm.annot.public.vcf.gz
+#  9bf1f6d4-29c9-4f68-88e1-4246d9ce16e0.consensus_somatic.norm.annot.public.vcf.gz
+#  cc060cd2-3f50-4e33-95bb-27d81619d808.lancet_somatic.norm.annot.public.vcf.gz
+#  5d9a45fe-a6ed-4619-8a2b-aa69614e8e03.strelka2_somatic.norm.annot.public.vcf.gz
+
+## Dropdown items
+# study_list <- unique(manifest$StudyID)
+# subject_list <- unique(manifest$ParticipantID)
+# sample_list <- unique(manifest$SampleID)
+
+# list of callers
+#  callers <- c("consensus", "strelka2", "mutect2", "lancet", "vardict")
+#  callers <- unique(manifest$Caller)
+
+# list of filtering levels
+# Left out due to size constraints:
+#  - Annotation: full annotated VCF produced by sarek
+#  - Region: filter VCF by GIAB mappable region
+# 
+# 1. Population:        filter by population allele frequency < 0.01
+# 2. Mutation:          filter by significant mutations
+# 3. ML Driver Genes:   filter by myeloid cancer driver genes
+# 4. Genes of Interest: filter all genes of interest out of region-filtered VCF
+filters <- c("Population", "Mutation", "ML Driver Genes", "Genes of Interest")
+filterNames <- c("ann.rtgfilt.popfilt", "ann.rtgfilt.popfilt.sigmut", 
+                 "ann.rtgfilt.popfilt.sigmut.genesmut", "ann.rtgfilt.allgenes")
+names(filterNames) <- filters
 
 ## lists of important genes to highlight in the table
 gene_lists <- read.csv("./sbgenomics/project-files/Gene_lists.txt", header = T, sep = "\t")
@@ -179,7 +212,7 @@ ui <- dashboardPage(
 server <- function(input, output, session) {
   
   # Get the VCF and BAM file directories
-  #roots=c(wd='.', vol='/Volumes', mnt='/mnt')
+  # roots=c(wd='.', vol='/Volumes', mnt='/mnt')
   
   # First we read in the manifest.  Then we populate the studyID dropdown with the available 
   # studyIDs.  The user selects a participantID, then a sampleID, then a caller, and can 
@@ -438,26 +471,27 @@ server <- function(input, output, session) {
     # print(newcols)
 
     # print(colnames(my.vcf.df))
+    # rename AF columns
+    if ("AF" %in% colnames(my.vcf.df)) {
+      my.vcf.df <- my.vcf.df |> rename(SAMPLE_AF = AF)
+    }
+
     # if multiple annotations, only take the 1st one (TODO: deal with multiple alleles)
     my.vcf.ANN.df <- my.vcf.df |> separate_wider_delim(CSQ, delim=",", names = c("CSQ"), too_many="drop")
     my.vcf.ANN.df <- my.vcf.ANN.df |> rename_with(~ paste0(.,"_INFO"), .cols = matches("^SOMATIC"))
     my.vcf.ANN.df <- my.vcf.ANN.df |> separate_wider_delim(CSQ, delim = "|", names = newcols,  
                                                            too_many = "debug", too_few = "debug", 
                                                            names_repair = "universal") # 
-    
-    # rename AF columns
-    if (caller == "haplotypecaller") {
-      my.vcf.ANN.df <- my.vcf.ANN.df |> rename("AF...11" = "AF", "AF...70" = "AF_TG") # requires AF to be in columns 11 and 69
-      #write.table(my.vcf.ANN.df, file="my.vcf.ANN.df.txt", quote=F)
-    }
-    #print(dim(my.vcf.ANN.df))
-    #Warning: Expected 93 pieces. Additional pieces discarded in 7 rows [1, 2, 3, 4, 5, 6, 7].
+    #if (caller == "haplotypecaller") {
+      # my.vcf.ANN.df <- my.vcf.ANN.df |> rename("AF...11" = "AF", "AF...70" = "AF_TG") # requires AF to be in columns 11 and 69
+      # write.table(my.vcf.ANN.df, file="my.vcf.ANN.df.txt", quote=F)
+    #}
 
     #### filter based on population frequency
     # Default: MAX_AF
     # TODO: allow user to select field instead of MAX_AF
     # pop_freq_cutoff (default 0.01)
-    # 
+    
     pop_freq_cutoff <- 1
     my.vcf.ANN.df <- my.vcf.ANN.df |> mutate(across(matches(c("gnomAD", "_AF")), \(x) as.numeric(x) )) 
                                    # |> filter(gnomAD_AF <= pop_freq_cutoff)
@@ -487,6 +521,7 @@ server <- function(input, output, session) {
     for (i in colnames(gene_lists)) {
       my.vcf.ANN.df[[i]] <- ifelse(my.vcf.ANN.df$SYMBOL %in% gene_lists[[i]] & 
                                    my.vcf.ANN.df$SYMBOL != '', 'Y', 'N')
+      my.vcf.ANN.df <- my.vcf.ANN.df |> relocate(i, .after=SYMBOL)
     }
     
     #### create an index from chr,pos,ref,alt
@@ -515,11 +550,10 @@ server <- function(input, output, session) {
     # 
     #### order the columns logically  "Leudrive", "ACMG", 
     my.vcf.ANN.df <- my.vcf.ANN.df |> 
-      relocate(c("Allele", "FILTER", "SYMBOL", "AA_mut", "IMPACT", "Consequence",  "Existing_variation"), 
-               .after=QUAL) |>
-      relocate(c(colnames(gene_lists),"CLIN_SIG", "SIFT", "PolyPhen", "AF", "gnomAD_AF"), 
-               .after=Consequence) |> 
-      relocate(index)
+      relocate(c("Allele", "FILTER", "SYMBOL", "AA_mut", "IMPACT", "Consequence",  "Existing_variation"), .after=QUAL) |>
+      relocate(c("CLIN_SIG", "SIFT", "PolyPhen"), .after=SOMATIC) #|> # .after=SOMATIC
+      #relocate(c("REVEL_score"), .after=DANN_score)
+    my.vcf.ANN.df <- my.vcf.ANN.df |> relocate(index)
     
     #### make columns numeric  
     # my.vcf.ANN.df <- my.vcf.ANN.df |> mutate(across(c('DANN_score', 'CADD_phred', 'REVEL_score'), \(x) as.numeric(x))) |>  
@@ -557,6 +591,7 @@ server <- function(input, output, session) {
       #                        deepvariant = list())
       # # population group
       # show_cols_pop <- c("AF", "POPAF", "gnomADe_AF", "gnomAD_AF", "MAX_AF")
+      # 
       # # gene group
       # show_cols_gene <- c("Allele,Consequence,IMPACT,SYMBOL,AA_mut,Leudrive,ACMG,Gene,Feature_type,
       #                      Feature,BIOTYPE,EXON,INTRON,cDNA_position,CDS_position,Protein_position,
@@ -583,6 +618,7 @@ server <- function(input, output, session) {
       show_cols <- append(show_cols, colnames(gene_lists))
       
       hide_cols <- which(!(colnames(df) %in% show_cols)) - 1
+
       return(hide_cols)
     }
     
