@@ -5,6 +5,7 @@ library(shiny)
 library(shinydashboard)
 library(shinyFiles)
 library(shinyalert)
+library(shinycssloaders)
 library(bslib)
 library(fs)
 
@@ -167,11 +168,22 @@ ui <- dashboardPage(
                 fluidRow(column(6, selectInput("vcfFile", "VCF File",
                                                 choices = NULL,
                                                 width = "600px")),
-                         column(6, tableOutput('vcfInfo'))),
-                
-
+                         column(4, div(style = "background-color: #cce2f5c5; padding: 1px; border-radius: 2px;",
+                                       tableOutput('vcfFileInfo'))), 
+                         # --- checkbox feature from test_shiny_checkbox.R prototype ---
+                         column(2, #tags$div(id = "geneFilterBox",
+                                box(title = "Genes to highlight", width = 12,
+                                    collapsible = TRUE, collapsed = TRUE,
+                                    selectInput(
+                                      inputId = "genes_to_highlight",
+                                      label   = "Select list(s) of genes to highlight:",
+                                      choices = colnames(gene_lists),
+                                      multiple = TRUE 
+                                    )
+                                ) # box
+                                #) # tags$div
+                              )),
                 fluidRow(column(12, 
-                                
                         tabBox( title = "",
                                 id = "main",
                                 width = 12,
@@ -179,7 +191,7 @@ ui <- dashboardPage(
                                          htmlOutput("readme")
                                     ),
                                     tabPanel("Table",
-                                        div(dataTableOutput("dataTable"))
+                                        div(withSpinner(dataTableOutput("dataTable")))
                                     ),
                                     tabPanel(title = "Legends",
                                         div (
@@ -188,11 +200,23 @@ ui <- dashboardPage(
                                             tabPanel("Legend",
                                               htmlOutput("legend")
                                             ),
-                                            tabPanel("Mutect2",
+                                            tabPanel("Mutect2 Legend",
                                             htmlOutput("mutect2_legend")
                                             ),
-                                            tabPanel("Lancet",
+                                            tabPanel("Lancet Legend",
                                             htmlOutput("lancet_legend")
+                                            ),
+                                            tabPanel("Strelka2 Legend",
+                                            htmlOutput("strelka2_legend")
+                                            ),
+                                            tabPanel("Manta Legend",
+                                            htmlOutput("manta_legend")
+                                            ),
+                                            tabPanel("Vardict Legend",
+                                            htmlOutput("vardict_legend")
+                                            ),
+                                            tabPanel("Consensus Legend",
+                                            htmlOutput("consensus_legend")
                                             )
                                           )
                                         )
@@ -215,10 +239,9 @@ ui <- dashboardPage(
                                                       column(4, downloadButton("downloadPlot", "Download Plot"))),
                                              plotOutput("plot")
                                     )
-                                             #htmlOutput("viewer"))
                         ) # tabBox
-                )) # fluidRow(column(12,
-      ) # dashboard body
+                  )) # fluidRow(column(12,
+        ) # dashboard body
 ) # ui
 #--------------------------------------------------------------
 
@@ -383,6 +406,7 @@ server <- function(input, output, session) {
         return(0)
       }
     }
+    # File size is in manifest
     VCFFileSize <- infile_df$VCFFileSize[match(input$vcfFile, infile_df$VCFFileName)]
     print(VCFFileSize)
     
@@ -417,21 +441,18 @@ server <- function(input, output, session) {
     } else {
       numVariants <- 1
     }
-    
-    # prints number of variants for given selections above the table
-    # output$numberOfVariants <- renderText({ paste("Number of variants in VCF: ", as.character(numVariants)) })
 
-    # create 1 row table with information about the selected vcf file
+    # create a 1-row table with information about the selected vcf file
     # TODO: check on uniqueness of VCFFileName
     vcfInfoTable <- infile_df |> filter(VCFFileName == input$vcfFile) |>
                                  dplyr::select(Sample.Anatomic.Site, Age.at.Sample.Collection.days, 
                                                SampleTumorStatus, Sample.Diagnosis) |>
-                                 dplyr::rename(Site = Sample.Anatomic.Site, Age_in_days = Age.at.Sample.Collection.days,
+                                 dplyr::rename(Anatomic_Site = Sample.Anatomic.Site, Age_in_days = Age.at.Sample.Collection.days,
                                                Status = SampleTumorStatus, Diagnosis = Sample.Diagnosis)
     Num_Variants <- c(numVariants)
     numVardf <- data.frame(Num_Variants)
     infile_df <- cbind(numVardf, vcfInfoTable)
-    output$vcfInfo <- renderTable({ infile_df })
+    output$vcfFileInfo <- renderTable({ infile_df }, bordered = TRUE)
     
     # mutect2 FORMAT:
     # GT:AD:AF:DP:F1R2:F2R1:FAD:SB    0/1:124,17:0.065:141:47,0:27,2:100,12:51,73,0,17
@@ -494,21 +515,19 @@ server <- function(input, output, session) {
 
     my.vcf.ANN.df <- my.vcf.ANN.df |> dplyr::rename_with(~ if(length(.x) == 0) character(0) else paste0(.,"_INFO"), 
                                                            .cols = matches("^SOMATIC"))
-    my.vcf.ANN.df <- my.vcf.ANN.df |> separate_wider_delim(CSQ, delim = "|", names = newcols,  
-                                                           too_many = "debug", too_few = "debug", 
-                                                           names_repair = "universal") # 
-    #if (caller == "haplotypecaller") {
-      # my.vcf.ANN.df <- my.vcf.ANN.df |> rename("AF...11" = "AF", "AF...70" = "AF_TG") # requires AF to be in columns 11 and 69
-      # write.table(my.vcf.ANN.df, file="my.vcf.ANN.df.txt", quote=F)
-    #}
+    my.vcf.ANN.df <- my.vcf.ANN.df |> separate_wider_delim(CSQ, delim = "|", names = newcols, 
+                                                           too_many = "debug", too_few = "debug", names_repair = "universal")
+    # too_many = "debug", too_few = "debug",
 
     #### filter based on population frequency
     # Default: MAX_AF
     # TODO: allow user to select field instead of MAX_AF
     # pop_freq_cutoff (default 0.01)
-    
     pop_freq_cutoff <- 1
-    my.vcf.ANN.df <- my.vcf.ANN.df |> mutate(across(matches(c("gnomAD", "_AF")), \(x) as.numeric(x) )) 
+    my.vcf.ANN.df <- my.vcf.ANN.df |> mutate(across(matches(c("gnomAD", "_AF")), \(x) {
+                                              x <- ifelse(x == ".", NA, x) # Replace VCF dots with true NA
+                                              as.numeric(x)
+                                              })) 
                                    # |> filter(gnomAD_AF <= pop_freq_cutoff)
     
     #### filter based on mutation severity
@@ -523,7 +542,7 @@ server <- function(input, output, session) {
                                        "3_prime_UTR_variant",
                                        "synonymous_variant")
     
-    # user selects mutation_filter (default "significant")
+    # TODO: user selects mutation_filter (default "significant")
     mutation_filter = "significant"
     if (mutation_filter == "less_significant") {
       mutation_list = c(significant_mutation_list, less_significant_mutation_list)
@@ -555,7 +574,7 @@ server <- function(input, output, session) {
     #                  mutate(PP2_HDIV_pred = str_extract(Polyphen2_HDIV_pred, "\\w"), .keep="unused", .after="PROVEAN_pred") |>
     #                  mutate(PP2_HVAR_pred = str_extract(Polyphen2_HVAR_pred, "\\w"), .keep="unused", .after="PP2_HDIV_pred") |>
     #                  mutate(REVEL_score = str_extract(REVEL_score, "\\d*\\.?\\d+"), .keep="unused")
-    # 
+ 
     #### order the columns logically  
     my.vcf.ANN.df <- my.vcf.ANN.df |> 
       relocate(c("Allele", "FILTER", "SYMBOL", "AA_mut", "IMPACT", "Consequence",  "Existing_variation"), .after=QUAL) |>
@@ -564,19 +583,14 @@ server <- function(input, output, session) {
     my.vcf.ANN.df <- my.vcf.ANN.df |> relocate(index)
     
     #### create columns flagging genes of interest
-    for (i in colnames(gene_lists)) {
+    #for (i in colnames(gene_lists)) {
+    for (i in input$genes_to_highlight) {
       my.vcf.ANN.df[[i]] <- ifelse(my.vcf.ANN.df$SYMBOL %in% gene_lists[[i]] & 
                                    my.vcf.ANN.df$SYMBOL != '', 'Y', 'N')
       my.vcf.ANN.df <- my.vcf.ANN.df |> relocate(i, .after=SYMBOL)
     }
-
-    #### make columns numeric  
-    # my.vcf.ANN.df <- my.vcf.ANN.df |> mutate(across(c('DANN_score', 'CADD_phred', 'REVEL_score'), \(x) as.numeric(x))) |>  
-    #                                    mutate(across(c('DANN_score', 'CADD_phred', 'REVEL_score'), \(x) round(x, 3)))   |>
-    #                                    mutate_if(is.numeric, ~replace(., is.na(.), 0))
-    #print(head(my.vcf.ANN.df))
     
-    # Deterrmine which columns to hide upon initial table display
+    # Determine which columns to hide upon initial table display
     hide_columns <- function(df, vcf) {
       # get column indices for columns to begin the display hidden
       # TODO: create groupings of columns to hide/show with a click
@@ -630,8 +644,9 @@ server <- function(input, output, session) {
       show_cols <- append(show_cols, colnames(vcf@gt))
       
       # get columns with genes of interest
-      show_cols <- append(show_cols, colnames(gene_lists))
-      
+      # show_cols <- append(show_cols, colnames(gene_lists))
+      show_cols <- append(show_cols, input$genes_to_highlight)
+
       hide_cols <- which(!(colnames(df) %in% show_cols)) - 1
 
       return(hide_cols)
@@ -703,10 +718,10 @@ server <- function(input, output, session) {
     formatStyle('IMPACT',
                 backgroundColor = styleEqual(c("HIGH", "MODERATE"), c('#FA5F55', 'yellow'))
     ) |> 
-    formatStyle(colnames(gene_lists),
+    formatStyle(input$genes_to_highlight,
                 backgroundColor = styleEqual(c("Y"), c('lightgreen'))
     ) |>
-    formatStyle('SYMBOL', colnames(gene_lists), fontWeight = styleEqual("Y", "bold"))  
+    formatStyle('SYMBOL', input$genes_to_highlight, fontWeight = styleEqual("Y", "bold"))  
     
     for (s in color_gradient_columns) {
       if (s %in% colnames(df)) { dt <- dt |> color_gradient(s) } # "gnomAD_AF"
@@ -742,7 +757,7 @@ server <- function(input, output, session) {
   
   # 2. Dynamically generate the renderUI for each tab
   callers = c("mutect2", "lancet", "strelka2", "manta", "vardict", "consensus")
-  lapply(names(callers), function(tab_name) {
+  lapply(callers, function(tab_name) {
     
     output[[paste0(tab_name, "_legend")]] <- renderUI({
       tags$iframe(
@@ -754,70 +769,6 @@ server <- function(input, output, session) {
     })
     
   })
-
-  # explanation of mutect2 header labels
-  # make_header_legend(filename) <- renderUI({
-  #   tags$iframe(
-  #     seamless="seamless",
-  #     #src="html_assets/mutect2_vcf_legend.html",
-  #     src=filename,
-  #     width=1200, 
-  #     height=800)
-  # })
-
-  #output$mutect2_legend <- make_header_legend("html_assets/mutect2_vcf_legend.html")
-  #output$mutect2_legend <- renderUI({
-  #  tags$iframe(
-  #    seamless="seamless",
-  #    src="html_assets/mutect2_vcf_legend.html",
-  #    width=1200, 
-  #    height=800)
-  #})
-
-  # lancet labels
-  # output$lancet_legend <- renderUI({
-  #   tags$iframe(
-  #     seamless="seamless",
-  #     src="html_assets/lancet_vcf_legend.html",
-  #     width=1200, 
-  #     height=800)
-  # })
-
-  # manta labels
-  # output$manta_legend <- renderUI({
-  #   tags$iframe(
-  #     seamless="seamless",
-  #     src="html_assets/manta_vcf_legend.html",
-  #     width=1200, 
-  #     height=800)
-  # })
-
-  # strelka labels
-  # output$strelka2_legend <- renderUI({
-  #   tags$iframe(
-  #     seamless="seamless",
-  #     src="html_assets/strelka2_vcf_legend.html",
-  #     width=1200, 
-  #     height=800)
-  # })
-
-  # consensus labels
-  # output$consensus_legend <- renderUI({
-  #   tags$iframe(
-  #     seamless="seamless",
-  #     src="html_assets/consensus_vcf_legend.html",
-  #     width=1200, 
-  #     height=800)
-  # })
-
-  # vardict labels
-  # output$vardict_legend <- renderUI({
-  #   tags$iframe(
-  #     seamless="seamless",
-  #     src="html_assets/vardict_vcf_legend.html",
-  #     width=1200, 
-  #     height=800)
-  # })
 
   # Instructions 
   output$readme <- renderUI({
