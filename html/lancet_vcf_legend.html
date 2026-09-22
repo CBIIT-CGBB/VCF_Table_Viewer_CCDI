@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>lancet VCF File Legend</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+        h1 { color: #111; margin-bottom: 25px; }
+        h2 { border-bottom: 2px solid #0056b3; padding-bottom: 5px; color: #0056b3; margin-top: 40px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; table-layout: fixed; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f4f4f4; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        code { background-color: #eef; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+        
+        th:nth-child(1), td:nth-child(1) { width: 25%; }
+        th:nth-child(2), td:nth-child(2) { width: 5%; }
+        th:nth-child(3), td:nth-child(3) { width: 5%; }
+        th:nth-child(4), td:nth-child(4) { width: 65%; }
+        
+        td:nth-child(4) { 
+            word-wrap: break-word; 
+            word-break: break-word; 
+            overflow-wrap: break-word; 
+        }
+        
+        .tooltip-container {
+            position: relative;
+            border-bottom: 1px dotted #666;
+            cursor: help;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .tooltip-container::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            white-space: nowrap;
+            font-size: 13px;
+            font-family: Arial, sans-serif;
+            font-weight: normal;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 10;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .tooltip-container:hover::after {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <h1>lancet VCF File Legend</h1>
+    
+    <h2>INFO Fields</h2>
+    <table>
+        <thead>
+            <tr><th>ID</th><th>Number</th><th>Type</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>AC</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Integer</td><td>Allele count in genotypes, for each ALT allele, in the same order as listed</td></tr>
+            <tr><td><code>AF</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Float</td><td>Allele Frequency, for each ALT allele, in the same order as listed</td></tr>
+            <tr><td><code>AN</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Total number of alleles in called genotypes</td></tr>
+            <tr><td><code>CSQ</code></td><td><span class="tooltip-container" data-tooltip=".: Unknown, unbounded, or variable number of values.">.</span></td><td>String</td><td>Consequence annotations from Ensembl VEP. Format: Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|Existing_variation|ALLELE_NUM|DISTANCE|STRAND|FLAGS|PICK|VARIANT_CLASS|SYMBOL_SOURCE|HGNC_ID|CANONICAL|TSL|CCDS|ENSP|SWISSPROT|TREMBL|UNIPARC|UNIPROT_ISOFORM|RefSeq|REFSEQ_MATCH|SOURCE|REFSEQ_OFFSET|GIVEN_REF|USED_REF|BAM_EDIT|GENE_PHENO|SIFT|PolyPhen|DOMAINS|HGVS_OFFSET|HGVSg|AFR_AF|AMR_AF|EAS_AF|EUR_AF|SAS_AF|AA_AF|EA_AF|gnomAD_AF|gnomAD_AFR_AF|gnomAD_AMR_AF|gnomAD_ASJ_AF|gnomAD_EAS_AF|gnomAD_FIN_AF|gnomAD_NFE_AF|gnomAD_OTH_AF|gnomAD_SAS_AF|CLIN_SIG|SOMATIC|PHENO|PUBMED|CHECK_REF|MOTIF_NAME|MOTIF_POS|HIGH_INF_POS|MOTIF_SCORE_CHANGE|TRANSCRIPTION_FACTORS</td></tr>
+            <tr><td><code>DP</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Approximate read depth; some reads may have been filtered</td></tr>
+            <tr><td><code>FETS</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>phred-scaled p-value of the Fisher's exact test for tumor-normal allele counts (right-sided)</td></tr>
+            <tr><td><code>KMERSIZE</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>K-mer size used to assemble the locus</td></tr>
+            <tr><td><code>LEN</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Variant size in base pairs</td></tr>
+            <tr><td><code>MS</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>String</td><td>Microsatellite mutation (format: #LEN#MOTIF)</td></tr>
+            <tr><td><code>NONE</code></td><td><span class="tooltip-container" data-tooltip="0: Field is a Flag (no values follow, its presence means true).">0</span></td><td>Flag</td><td>Mutation not supported by data</td></tr>
+            <tr><td><code>NORMAL</code></td><td><span class="tooltip-container" data-tooltip="0: Field is a Flag (no values follow, its presence means true).">0</span></td><td>Flag</td><td>Mutation present only in the normal</td></tr>
+            <tr><td><code>OLD_VARIANT</code></td><td><span class="tooltip-container" data-tooltip=".: Unknown, unbounded, or variable number of values.">.</span></td><td>String</td><td>Original chr:pos:ref:alt encoding</td></tr>
+            <tr><td><code>SB</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>Phred-scaled strand bias of the Fisher's exact test (two-sided)</td></tr>
+            <tr><td><code>SHARED</code></td><td><span class="tooltip-container" data-tooltip="0: Field is a Flag (no values follow, its presence means true).">0</span></td><td>Flag</td><td>Shared mutation betweem tumor and normal</td></tr>
+            <tr><td><code>SOMATIC</code></td><td><span class="tooltip-container" data-tooltip="0: Field is a Flag (no values follow, its presence means true).">0</span></td><td>Flag</td><td>Somatic mutation</td></tr>
+            <tr><td><code>TYPE</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>String</td><td>Variant type (snv, del, ins, complex)</td></tr>
+            <tr><td><code>gnomad_3_1_1_AC</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Integer</td><td>Alternate allele count</td></tr>
+            <tr><td><code>gnomad_3_1_1_AC_controls_and_biobanks</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Integer</td><td>Alternate allele count in controls_and_biobanks subset</td></tr>
+            <tr><td><code>gnomad_3_1_1_AC_popmax</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Integer</td><td>Allele count in the population with the maximum allele frequency</td></tr>
+            <tr><td><code>gnomad_3_1_1_AF</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Float</td><td>Alternate allele frequency</td></tr>
+            <tr><td><code>gnomad_3_1_1_AF_controls_and_biobanks</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Float</td><td>Alternate allele frequency in controls_and_biobanks subset</td></tr>
+            <tr><td><code>gnomad_3_1_1_AF_non_cancer</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Float</td><td>Alternate allele frequency in non_cancer subset</td></tr>
+            <tr><td><code>gnomad_3_1_1_AF_popmax</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Float</td><td>Maximum allele frequency across populations</td></tr>
+            <tr><td><code>gnomad_3_1_1_AN</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Total number of alleles</td></tr>
+            <tr><td><code>gnomad_3_1_1_AN_controls_and_biobanks</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Total number of alleles in controls_and_biobanks subset</td></tr>
+            <tr><td><code>gnomad_3_1_1_AN_popmax</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Integer</td><td>Total number of alleles in the population with the maximum allele frequency</td></tr>
+            <tr><td><code>gnomad_3_1_1_nhomalt</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Integer</td><td>Count of homozygous individuals</td></tr>
+            <tr><td><code>gnomad_3_1_1_nhomalt_popmax</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Integer</td><td>Count of homozygous individuals in the population with the maximum allele frequency</td></tr>
+            <tr><td><code>gnomad_3_1_1_primate_ai_score</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>PrimateAI's deleteriousness score from 0 (less deleterious) to 1 (more deleterious).</td></tr>
+            <tr><td><code>gnomad_3_1_1_splice_ai_consequence</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>String</td><td>The consequence term associated with the max delta score in 'splice_ai_max_ds'.</td></tr>
+            <tr><td><code>HotSpotAllele</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Integer</td><td>Is the corresponding ALT allele on a hotspot (0 for false; 1 for true).</td></tr>
+        </tbody>
+    </table>
+    
+    <h2>FORMAT Fields</h2>
+    <table>
+        <thead>
+            <tr><th>ID</th><th>Number</th><th>Type</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>AD</code></td><td><span class="tooltip-container" data-tooltip="R: One value per allele, including the REFERENCE allele.">R</span></td><td>Integer</td><td>Allelic depths for the ref and alt alleles in the order listed</td></tr>
+            <tr><td><code>DP</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Depth</td></tr>
+            <tr><td><code>GT</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>String</td><td>Genotype</td></tr>
+            <tr><td><code>SA</code></td><td><span class="tooltip-container" data-tooltip=".: Unknown, unbounded, or variable number of values.">.</span></td><td>Integer</td><td>strand counts for alt: # of supporting forward,reverse reads for alterantive allele</td></tr>
+            <tr><td><code>SR</code></td><td><span class="tooltip-container" data-tooltip=".: Unknown, unbounded, or variable number of values.">.</span></td><td>Integer</td><td>strand counts for ref: # of supporting forward,reverse reads for reference allele</td></tr>
+        </tbody>
+    </table>
+</body>
+</html>
