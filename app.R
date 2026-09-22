@@ -76,8 +76,9 @@ gene_lists <- read.csv("./sbgenomics/project-files/Gene_lists.txt", header = T, 
 
 ####-----------------------Utilities----------------------####
 
-# needed for reading in the legend HTML file vcf_field_descriptions.html
-addResourcePath("tmpuser", getwd()) 
+# needed for reading in the legend HTML files 
+# addResourcePath("tmpuser", getwd()) 
+addResourcePath(prefix = "html_assets", directoryPath = "html")
 
 printf <- function(...) print(noquote(sprintf(...))) # used with igvShiny
 
@@ -180,8 +181,21 @@ ui <- dashboardPage(
                                     tabPanel("Table",
                                         div(dataTableOutput("dataTable"))
                                     ),
-                                    tabPanel("Legend",
-                                        htmlOutput("legend")
+                                    tabPanel(title = "Legends",
+                                        div (
+                                          tabsetPanel(id = "Legends2",
+
+                                            tabPanel("Legend",
+                                              htmlOutput("legend")
+                                            ),
+                                            tabPanel("Mutect2",
+                                            htmlOutput("mutect2_legend")
+                                            ),
+                                            tabPanel("Lancet",
+                                            htmlOutput("lancet_legend")
+                                            )
+                                          )
+                                        )
                                     ),
                                     tabPanel("BAM Viewer",
                                         fluidRow(
@@ -476,6 +490,8 @@ server <- function(input, output, session) {
 
     # if multiple annotations, only take the 1st one (TODO: deal with multiple alleles)
     my.vcf.ANN.df <- my.vcf.df |> separate_wider_delim(CSQ, delim=",", names = c("CSQ"), too_many="drop")
+    # Warning: Debug mode activated: adding variables `CSQ_ok`, `CSQ_pieces`, and `CSQ_remainder`.
+
     my.vcf.ANN.df <- my.vcf.ANN.df |> dplyr::rename_with(~ if(length(.x) == 0) character(0) else paste0(.,"_INFO"), 
                                                            .cols = matches("^SOMATIC"))
     my.vcf.ANN.df <- my.vcf.ANN.df |> separate_wider_delim(CSQ, delim = "|", names = newcols,  
@@ -540,7 +556,7 @@ server <- function(input, output, session) {
     #                  mutate(PP2_HVAR_pred = str_extract(Polyphen2_HVAR_pred, "\\w"), .keep="unused", .after="PP2_HDIV_pred") |>
     #                  mutate(REVEL_score = str_extract(REVEL_score, "\\d*\\.?\\d+"), .keep="unused")
     # 
-    #### order the columns logically  "Leudrive", "ACMG", 
+    #### order the columns logically  
     my.vcf.ANN.df <- my.vcf.ANN.df |> 
       relocate(c("Allele", "FILTER", "SYMBOL", "AA_mut", "IMPACT", "Consequence",  "Existing_variation"), .after=QUAL) |>
       relocate(c("CLIN_SIG", "SIFT", "PolyPhen"), .after=SOMATIC) #|> # .after=SOMATIC
@@ -710,21 +726,105 @@ server <- function(input, output, session) {
     dt
   }) # renderDT
   
+  #-----------------------------------------------------------------------------#
   # explanation of vcf labels in table
+  #  -> includes caller-specific legends in tabs
+  #-----------------------------------------------------------------------------#
+  
+  # general legend
   output$legend <- renderUI({
     tags$iframe(
       seamless="seamless",
-      src="tmpuser/vcf_field_descriptions.html",
-      width=800, 
+      src="html_assets/vcf_field_descriptions.html",
+      width=1200, 
       height=800)
   })
   
-  # README file
+  # 2. Dynamically generate the renderUI for each tab
+  callers = c("mutect2", "lancet", "strelka2", "manta", "vardict", "consensus")
+  lapply(names(callers), function(tab_name) {
+    
+    output[[paste0(tab_name, "_legend")]] <- renderUI({
+      tags$iframe(
+      seamless="seamless",
+      #src="html_assets/mutect2_vcf_legend.html",
+      src=paste0("html_assets/", tab_name, "_vcf_legend.html"),
+      width=1200, 
+      height=800)
+    })
+    
+  })
+
+  # explanation of mutect2 header labels
+  # make_header_legend(filename) <- renderUI({
+  #   tags$iframe(
+  #     seamless="seamless",
+  #     #src="html_assets/mutect2_vcf_legend.html",
+  #     src=filename,
+  #     width=1200, 
+  #     height=800)
+  # })
+
+  #output$mutect2_legend <- make_header_legend("html_assets/mutect2_vcf_legend.html")
+  #output$mutect2_legend <- renderUI({
+  #  tags$iframe(
+  #    seamless="seamless",
+  #    src="html_assets/mutect2_vcf_legend.html",
+  #    width=1200, 
+  #    height=800)
+  #})
+
+  # lancet labels
+  # output$lancet_legend <- renderUI({
+  #   tags$iframe(
+  #     seamless="seamless",
+  #     src="html_assets/lancet_vcf_legend.html",
+  #     width=1200, 
+  #     height=800)
+  # })
+
+  # manta labels
+  # output$manta_legend <- renderUI({
+  #   tags$iframe(
+  #     seamless="seamless",
+  #     src="html_assets/manta_vcf_legend.html",
+  #     width=1200, 
+  #     height=800)
+  # })
+
+  # strelka labels
+  # output$strelka2_legend <- renderUI({
+  #   tags$iframe(
+  #     seamless="seamless",
+  #     src="html_assets/strelka2_vcf_legend.html",
+  #     width=1200, 
+  #     height=800)
+  # })
+
+  # consensus labels
+  # output$consensus_legend <- renderUI({
+  #   tags$iframe(
+  #     seamless="seamless",
+  #     src="html_assets/consensus_vcf_legend.html",
+  #     width=1200, 
+  #     height=800)
+  # })
+
+  # vardict labels
+  # output$vardict_legend <- renderUI({
+  #   tags$iframe(
+  #     seamless="seamless",
+  #     src="html_assets/vardict_vcf_legend.html",
+  #     width=1200, 
+  #     height=800)
+  # })
+
+  # Instructions 
   output$readme <- renderUI({
     tags$iframe(
       seamless="seamless",
-      src="tmpuser/Instructions.html",
-      width=800,
+      src="html_assets/Instructions.html",
+      width=1200,
       height=800)
   })
   
@@ -765,7 +865,8 @@ server <- function(input, output, session) {
     chrom_pos <- paste0(variant$CHROM, ":", variant$POS)
     showGenomicRegion(session, id="igvShiny_0", chrom_pos) # chr21:10,397,614-10,423,341
     
-    samples <- variant |> select(starts_with("FPD_")) # FPD_0028_FPD_0028_SK211E
+    # TODO: need to get rid of FPD_ hardcoding
+    samples <- variant |> select(all_of(starts_with("FPD_"))) # FPD_0028_FPD_0028_SK211E
     #print(samples)
     sample_names <- colnames(samples)
     
@@ -878,14 +979,14 @@ server <- function(input, output, session) {
     # need gene symbol + aa mutation if available, select out GT fields
     samples <- x |> mutate(index = case_when(!is.na(AA_mut) ~ paste0(SYMBOL, "(", AA_mut, ")"), 
                                               .default = index)) |> 
-                    select(index, starts_with("FPD_")) 
+                    select(index, all_of(starts_with("FPD_"))) 
                      
     print(samples)
 
     getAF <- ~as.numeric(unlist(strsplit(.x, ":"))[3])
     samples <- samples |> rowwise() |> mutate(across(starts_with("FPD_"), getAF)) |>
                           rename_with(~str_remove(., "^FPD_[\\d]{4}_")) |>
-                          select(contains("SK"), sort(colnames(.)))
+                          select(all_of(contains("SK")), sort(colnames(.)))
     #print(samples)
       
     factor(substring(x, 1, 2)) # orders the sample names

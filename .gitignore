@@ -3,6 +3,7 @@
 rsconnect/                   
 TODO.txt
 .Rproj
+test.py
 
 # Compiled source #
 ###################
@@ -29,3 +30,4 @@ TODO.txt
 .DS_Store
 .DS_Store?
 .Rproj.user
+

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>vardict VCF File Legend</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+        h1 { color: #111; margin-bottom: 25px; }
+        h2 { border-bottom: 2px solid #0056b3; padding-bottom: 5px; color: #0056b3; margin-top: 40px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; table-layout: fixed; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f4f4f4; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        code { background-color: #eef; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+        
+        th:nth-child(1), td:nth-child(1) { width: 25%; }
+        th:nth-child(2), td:nth-child(2) { width: 5%; }
+        th:nth-child(3), td:nth-child(3) { width: 5%; }
+        th:nth-child(4), td:nth-child(4) { width: 65%; }
+        
+        td:nth-child(4) { 
+            word-wrap: break-word; 
+            word-break: break-word; 
+            overflow-wrap: break-word; 
+        }
+        
+        .tooltip-container {
+            position: relative;
+            border-bottom: 1px dotted #666;
+            cursor: help;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .tooltip-container::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            white-space: nowrap;
+            font-size: 13px;
+            font-family: Arial, sans-serif;
+            font-weight: normal;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 10;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .tooltip-container:hover::after {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <h1>vardict VCF File Legend</h1>
+    
+    <h2>INFO Fields</h2>
+    <table>
+        <thead>
+            <tr><th>ID</th><th>Number</th><th>Type</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>AC</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Integer</td><td>Allele count in genotypes, for each ALT allele, in the same order as listed</td></tr>
+            <tr><td><code>AF</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Float</td><td>Allele Frequency, for each ALT allele, in the same order as listed</td></tr>
+            <tr><td><code>AN</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Total number of alleles in called genotypes</td></tr>
+            <tr><td><code>CSQ</code></td><td><span class="tooltip-container" data-tooltip=".: Unknown, unbounded, or variable number of values.">.</span></td><td>String</td><td>Consequence annotations from Ensembl VEP. Format: Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|Existing_variation|ALLELE_NUM|DISTANCE|STRAND|FLAGS|PICK|VARIANT_CLASS|SYMBOL_SOURCE|HGNC_ID|CANONICAL|TSL|CCDS|ENSP|SWISSPROT|TREMBL|UNIPARC|UNIPROT_ISOFORM|RefSeq|REFSEQ_MATCH|SOURCE|REFSEQ_OFFSET|GIVEN_REF|USED_REF|BAM_EDIT|GENE_PHENO|SIFT|PolyPhen|DOMAINS|HGVS_OFFSET|HGVSg|AFR_AF|AMR_AF|EAS_AF|EUR_AF|SAS_AF|AA_AF|EA_AF|gnomAD_AF|gnomAD_AFR_AF|gnomAD_AMR_AF|gnomAD_ASJ_AF|gnomAD_EAS_AF|gnomAD_FIN_AF|gnomAD_NFE_AF|gnomAD_OTH_AF|gnomAD_SAS_AF|CLIN_SIG|SOMATIC|PHENO|PUBMED|CHECK_REF|MOTIF_NAME|MOTIF_POS|HIGH_INF_POS|MOTIF_SCORE_CHANGE|TRANSCRIPTION_FACTORS</td></tr>
+            <tr><td><code>DP</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Approximate read depth; some reads may have been filtered</td></tr>
+            <tr><td><code>END</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Chr End Position</td></tr>
+            <tr><td><code>LSEQ</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>String</td><td>5' flanking seq</td></tr>
+            <tr><td><code>MSI</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>MicroSatellite. > 1 indicates MSI</td></tr>
+            <tr><td><code>MSILEN</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>MSI unit repeat length in bp</td></tr>
+            <tr><td><code>OLD_VARIANT</code></td><td><span class="tooltip-container" data-tooltip=".: Unknown, unbounded, or variable number of values.">.</span></td><td>String</td><td>Original chr:pos:ref:alt encoding</td></tr>
+            <tr><td><code>RSEQ</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>String</td><td>3' flanking seq</td></tr>
+            <tr><td><code>SAMPLE</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>String</td><td>Sample name (with whitespace translated to underscores)</td></tr>
+            <tr><td><code>SHIFT3</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>No. of bases to be shifted to 3 prime for deletions due to alternative alignment</td></tr>
+            <tr><td><code>SOR</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>Odds ratio</td></tr>
+            <tr><td><code>SSF</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>P-value</td></tr>
+            <tr><td><code>STATUS</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>String</td><td>Somatic or germline status</td></tr>
+            <tr><td><code>TYPE</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>String</td><td>Variant Type: SNV Insertion Deletion Complex</td></tr>
+            <tr><td><code>VD</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Variant Depth</td></tr>
+            <tr><td><code>gnomad_3_1_1_AC</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Integer</td><td>Alternate allele count</td></tr>
+            <tr><td><code>gnomad_3_1_1_AC_controls_and_biobanks</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Integer</td><td>Alternate allele count in controls_and_biobanks subset</td></tr>
+            <tr><td><code>gnomad_3_1_1_AC_popmax</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Integer</td><td>Allele count in the population with the maximum allele frequency</td></tr>
+            <tr><td><code>gnomad_3_1_1_AF</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Float</td><td>Alternate allele frequency</td></tr>
+            <tr><td><code>gnomad_3_1_1_AF_controls_and_biobanks</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Float</td><td>Alternate allele frequency in controls_and_biobanks subset</td></tr>
+            <tr><td><code>gnomad_3_1_1_AF_non_cancer</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Float</td><td>Alternate allele frequency in non_cancer subset</td></tr>
+            <tr><td><code>gnomad_3_1_1_AF_popmax</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Float</td><td>Maximum allele frequency across populations</td></tr>
+            <tr><td><code>gnomad_3_1_1_AN</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Total number of alleles</td></tr>
+            <tr><td><code>gnomad_3_1_1_AN_controls_and_biobanks</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Total number of alleles in controls_and_biobanks subset</td></tr>
+            <tr><td><code>gnomad_3_1_1_AN_popmax</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Integer</td><td>Total number of alleles in the population with the maximum allele frequency</td></tr>
+            <tr><td><code>gnomad_3_1_1_nhomalt</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Integer</td><td>Count of homozygous individuals</td></tr>
+            <tr><td><code>gnomad_3_1_1_nhomalt_popmax</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Integer</td><td>Count of homozygous individuals in the population with the maximum allele frequency</td></tr>
+            <tr><td><code>gnomad_3_1_1_primate_ai_score</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>PrimateAI's deleteriousness score from 0 (less deleterious) to 1 (more deleterious).</td></tr>
+            <tr><td><code>gnomad_3_1_1_splice_ai_consequence</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>String</td><td>The consequence term associated with the max delta score in 'splice_ai_max_ds'.</td></tr>
+            <tr><td><code>HotSpotAllele</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>Integer</td><td>Is the corresponding ALT allele on a hotspot (0 for false; 1 for true).</td></tr>
+        </tbody>
+    </table>
+    
+    <h2>FORMAT Fields</h2>
+    <table>
+        <thead>
+            <tr><th>ID</th><th>Number</th><th>Type</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>AD</code></td><td><span class="tooltip-container" data-tooltip="R: One value per allele, including the REFERENCE allele.">R</span></td><td>Integer</td><td>Allelic depths for the ref and alt alleles in the order listed</td></tr>
+            <tr><td><code>ADJAF</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>Adjusted AF for indels due to local realignment</td></tr>
+            <tr><td><code>AF</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>Allele Frequency</td></tr>
+            <tr><td><code>ALD</code></td><td><span class="tooltip-container" data-tooltip="2: Exactly 2 fixed values expected.">2</span></td><td>Integer</td><td>Variant forward, reverse reads</td></tr>
+            <tr><td><code>BIAS</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>String</td><td>Strand Bias Info</td></tr>
+            <tr><td><code>DP</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Total Depth</td></tr>
+            <tr><td><code>GT</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>String</td><td>Genotype</td></tr>
+            <tr><td><code>HIAF</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>Allele frequency using only high quality bases</td></tr>
+            <tr><td><code>MQ</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>Mean Mapping Quality</td></tr>
+            <tr><td><code>NM</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>Mean mismatches in reads</td></tr>
+            <tr><td><code>ODDRATIO</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>Strand Bias Odds ratio</td></tr>
+            <tr><td><code>PMEAN</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>Mean position in reads</td></tr>
+            <tr><td><code>PSTD</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>Position STD in reads</td></tr>
+            <tr><td><code>QSTD</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>Quality score STD in reads</td></tr>
+            <tr><td><code>QUAL</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>Mean quality score in reads</td></tr>
+            <tr><td><code>RD</code></td><td><span class="tooltip-container" data-tooltip="2: Exactly 2 fixed values expected.">2</span></td><td>Integer</td><td>Reference forward, reverse reads</td></tr>
+            <tr><td><code>SBF</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>Strand Bias Fisher p-value</td></tr>
+            <tr><td><code>SN</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Float</td><td>Signal to noise</td></tr>
+            <tr><td><code>VD</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Variant Depth</td></tr>
+        </tbody>
+    </table>
+</body>
+</html>

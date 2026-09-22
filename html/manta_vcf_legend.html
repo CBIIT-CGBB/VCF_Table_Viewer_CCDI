@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>manta VCF File Legend</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+        h1 { color: #111; margin-bottom: 25px; }
+        h2 { border-bottom: 2px solid #0056b3; padding-bottom: 5px; color: #0056b3; margin-top: 40px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; table-layout: fixed; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f4f4f4; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        code { background-color: #eef; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+        
+        th:nth-child(1), td:nth-child(1) { width: 25%; }
+        th:nth-child(2), td:nth-child(2) { width: 5%; }
+        th:nth-child(3), td:nth-child(3) { width: 5%; }
+        th:nth-child(4), td:nth-child(4) { width: 65%; }
+        
+        td:nth-child(4) { 
+            word-wrap: break-word; 
+            word-break: break-word; 
+            overflow-wrap: break-word; 
+        }
+        
+        .tooltip-container {
+            position: relative;
+            border-bottom: 1px dotted #666;
+            cursor: help;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .tooltip-container::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            white-space: nowrap;
+            font-size: 13px;
+            font-family: Arial, sans-serif;
+            font-weight: normal;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 10;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .tooltip-container:hover::after {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <h1>manta VCF File Legend</h1>
+    
+    <h2>INFO Fields</h2>
+    <table>
+        <thead>
+            <tr><th>ID</th><th>Number</th><th>Type</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>IMPRECISE</code></td><td><span class="tooltip-container" data-tooltip="0: Field is a Flag (no values follow, its presence means true).">0</span></td><td>Flag</td><td>Imprecise structural variation</td></tr>
+            <tr><td><code>SVTYPE</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>String</td><td>Type of structural variant</td></tr>
+            <tr><td><code>SVLEN</code></td><td><span class="tooltip-container" data-tooltip=".: Unknown, unbounded, or variable number of values.">.</span></td><td>Integer</td><td>Difference in length between REF and ALT alleles</td></tr>
+            <tr><td><code>END</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>End position of the variant described in this record</td></tr>
+            <tr><td><code>CIPOS</code></td><td><span class="tooltip-container" data-tooltip="2: Exactly 2 fixed values expected.">2</span></td><td>Integer</td><td>Confidence interval around POS</td></tr>
+            <tr><td><code>CIEND</code></td><td><span class="tooltip-container" data-tooltip="2: Exactly 2 fixed values expected.">2</span></td><td>Integer</td><td>Confidence interval around END</td></tr>
+            <tr><td><code>CIGAR</code></td><td><span class="tooltip-container" data-tooltip="A: One value per ALTERNATE allele.">A</span></td><td>String</td><td>CIGAR alignment for each alternate indel allele</td></tr>
+            <tr><td><code>MATEID</code></td><td><span class="tooltip-container" data-tooltip=".: Unknown, unbounded, or variable number of values.">.</span></td><td>String</td><td>ID of mate breakend</td></tr>
+            <tr><td><code>EVENT</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>String</td><td>ID of event associated to breakend</td></tr>
+            <tr><td><code>HOMLEN</code></td><td><span class="tooltip-container" data-tooltip=".: Unknown, unbounded, or variable number of values.">.</span></td><td>Integer</td><td>Length of base pair identical homology at event breakpoints</td></tr>
+            <tr><td><code>HOMSEQ</code></td><td><span class="tooltip-container" data-tooltip=".: Unknown, unbounded, or variable number of values.">.</span></td><td>String</td><td>Sequence of base pair identical homology at event breakpoints</td></tr>
+            <tr><td><code>SVINSLEN</code></td><td><span class="tooltip-container" data-tooltip=".: Unknown, unbounded, or variable number of values.">.</span></td><td>Integer</td><td>Length of insertion</td></tr>
+            <tr><td><code>SVINSSEQ</code></td><td><span class="tooltip-container" data-tooltip=".: Unknown, unbounded, or variable number of values.">.</span></td><td>String</td><td>Sequence of insertion</td></tr>
+            <tr><td><code>LEFT_SVINSSEQ</code></td><td><span class="tooltip-container" data-tooltip=".: Unknown, unbounded, or variable number of values.">.</span></td><td>String</td><td>Known left side of insertion for an insertion of unknown length</td></tr>
+            <tr><td><code>RIGHT_SVINSSEQ</code></td><td><span class="tooltip-container" data-tooltip=".: Unknown, unbounded, or variable number of values.">.</span></td><td>String</td><td>Known right side of insertion for an insertion of unknown length</td></tr>
+            <tr><td><code>PAIR_COUNT</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Read pairs supporting this variant where both reads are confidently mapped</td></tr>
+            <tr><td><code>BND_PAIR_COUNT</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Confidently mapped reads supporting this variant at this breakend (mapping may not be confident at remote breakend)</td></tr>
+            <tr><td><code>UPSTREAM_PAIR_COUNT</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Confidently mapped reads supporting this variant at the upstream breakend (mapping may not be confident at downstream breakend)</td></tr>
+            <tr><td><code>DOWNSTREAM_PAIR_COUNT</code></td><td><span class="tooltip-container" data-tooltip="1: Exactly one value is expected.">1</span></td><td>Integer</td><td>Confidently mapped reads supporting this variant at this downstream breakend (mapping may not be confident at upstream breakend)</td></tr>
+        </tbody>
+    </table>
+    
+    <h2>FORMAT Fields</h2>
+    <table>
+        <thead>
+            <tr><th>ID</th><th>Number</th><th>Type</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+</body>
+</html>
