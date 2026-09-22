@@ -1,7 +1,6 @@
 import gzip
 import re
 import sys
-import os
 
 # Mapping VCF "Number" spec to descriptions for tooltips
 NUMBER_TOOLTIPS = {
