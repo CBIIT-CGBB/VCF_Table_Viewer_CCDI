@@ -63,13 +63,12 @@ library(GenomicAlignments)
 # 2. Mutation:          filter by significant mutations
 # 3. ML Driver Genes:   filter by myeloid cancer driver genes
 # 4. Genes of Interest: filter all genes of interest out of region-filtered VCF
-filters <- c("Population", "Mutation", "ML Driver Genes", "Genes of Interest")
-filterNames <- c("ann.rtgfilt.popfilt", "ann.rtgfilt.popfilt.sigmut", 
-                 "ann.rtgfilt.popfilt.sigmut.genesmut", "ann.rtgfilt.allgenes")
-names(filterNames) <- filters
+# filters <- c("Population", "Mutation", "ML Driver Genes", "Genes of Interest")
+# filterNames <- c("ann.rtgfilt.popfilt", "ann.rtgfilt.popfilt.sigmut", 
+#                  "ann.rtgfilt.popfilt.sigmut.genesmut", "ann.rtgfilt.allgenes")
+# names(filterNames) <- filters
 
-## lists of important genes to highlight in the table
-gene_lists <- read.csv("./sbgenomics/project-files/Gene_lists.txt", header = T, sep = "\t")
+
 
 #--------------------------------------------------------------
 
@@ -137,10 +136,15 @@ ui <- dashboardPage(
            #hr(style = "border-top: 1px solid #ccc; margin: 10px 0;"), # Add a styled horizontal rule
            
            p("Load the lists of genes of interest to highlight."),
-           fileInput("gene_list", label = "Select the gene lists (tab-delimited, with headers):")
+           fileInput("gene_list", label = "Select the gene lists (tab-delimited, with headers):"),
            #         accept = c(".txt", ".tsv")#,
-           
-
+           selectInput(
+              inputId = "genes_to_highlight",
+              label   = "Select list(s) of genes to highlight:",
+              choices = "Load a file with lists of genes to highlight.",
+              multiple = TRUE 
+           )
+                              
       ), # dashboardSidebar
                 
       dashboardBody(
@@ -169,26 +173,17 @@ ui <- dashboardPage(
                                                 choices = NULL,
                                                 width = "600px")),
                          column(4, div(style = "background-color: #cce2f5c5; padding: 1px; border-radius: 2px;",
-                                       tableOutput('vcfFileInfo'))), 
-                         # --- checkbox feature from test_shiny_checkbox.R prototype ---
-                         column(2, #tags$div(id = "geneFilterBox",
-                                box(title = "Genes to highlight", width = 12,
-                                    collapsible = TRUE, collapsed = TRUE,
-                                    selectInput(
-                                      inputId = "genes_to_highlight",
-                                      label   = "Select list(s) of genes to highlight:",
-                                      choices = colnames(gene_lists),
-                                      multiple = TRUE 
-                                    )
-                                ) # box
-                                #) # tags$div
-                              )),
+                                       tableOutput('vcfFileInfo'))) 
+                         ),
                 fluidRow(column(12, 
                         tabBox( title = "",
                                 id = "main",
                                 width = 12,
                                     tabPanel("README",
                                          htmlOutput("readme")
+                                    ),
+                                    tabPanel("Input Manifest",
+                                        div(withSpinner(dataTableOutput("manifestTable")))
                                     ),
                                     tabPanel("Table",
                                         div(withSpinner(dataTableOutput("dataTable")))
@@ -255,7 +250,6 @@ server <- function(input, output, session) {
   # studyIDs.  The user selects a participantID, then a sampleID, then a caller, and can 
   # optionally select Sample Type (Tumor or Normal) and File Access (Open or Controlled - both will be shown if not selected)
   
-  #EDITING this to change the default to be 
   df_manifest <- reactive({   
     if (is.null(input$manifest)) {
       manifest_file <- "sbgenomics/project-files/VCF_Table_Viewer_CCDI_manifest_all_fields.csv"
@@ -265,6 +259,38 @@ server <- function(input, output, session) {
     read.csv(manifest_file, header=TRUE, sep=",")
   })
   
+  output$manifestTable <- renderDT({
+  
+    dt <- DT::datatable(
+      df_manifest(), 
+      rownames=FALSE, 
+      extensions = c('FixedColumns','FixedHeader','Buttons'), 
+      options = list(
+        dom = 'Blfrtip',
+        fixedHeader=TRUE,
+        fixedColumns=TRUE,
+        pageLength = 100,
+        lengthMenu = list(c(50, 100, -1), c('50','100','All')),
+        autoWidth = TRUE,
+        scrollX = TRUE
+        #searchCols = list(filter_list)  # initialize filters on each column
+      ), # options
+      class = "display nowrap compact", # style
+      filter = "top" # location of column filters
+    )
+    
+  })
+  
+  ## lists of important genes to highlight in the table
+  gene_lists_load <- reactiveVal(NULL)
+
+  observeEvent(input$gene_list, {
+    req(input$gene_list$datapath)
+    genes <- read.csv(input$gene_list$datapath, header = T, sep = "\t")
+    gene_lists_load(genes)
+    updateSelectInput(session, "genes_to_highlight", choices = colnames(genes))
+  })
+
   ccdi_study <- reactive({
     req(df_manifest())
     unique(df_manifest() %>% pull(StudyID)) 
@@ -583,11 +609,16 @@ server <- function(input, output, session) {
     my.vcf.ANN.df <- my.vcf.ANN.df |> relocate(index)
     
     #### create columns flagging genes of interest
-    #for (i in colnames(gene_lists)) {
-    for (i in input$genes_to_highlight) {
-      my.vcf.ANN.df[[i]] <- ifelse(my.vcf.ANN.df$SYMBOL %in% gene_lists[[i]] & 
-                                   my.vcf.ANN.df$SYMBOL != '', 'Y', 'N')
-      my.vcf.ANN.df <- my.vcf.ANN.df |> relocate(i, .after=SYMBOL)
+    gene_lists <- gene_lists_load()
+    # Only run the loop if the file has been uploaded and input selections exist
+    if (!is.null(gene_lists) && !is.null(input$genes_to_highlight)) {
+      for (i in input$genes_to_highlight) {
+        if (i %in% names(gene_lists)) {
+          my.vcf.ANN.df[[i]] <- ifelse(my.vcf.ANN.df$SYMBOL %in% gene_lists[[i]] & 
+                                     my.vcf.ANN.df$SYMBOL != '', 'Y', 'N')
+          my.vcf.ANN.df <- my.vcf.ANN.df |> relocate(!!sym(i), .after = SYMBOL)
+        }
+      }
     }
     
     # Determine which columns to hide upon initial table display
