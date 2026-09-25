@@ -172,7 +172,7 @@ ui <- dashboardPage(
                 fluidRow(column(6, selectInput("vcfFile", "VCF File",
                                                 choices = NULL,
                                                 width = "600px")),
-                         column(4, div(style = "background-color: #cce2f5c5; padding: 1px; border-radius: 2px;",
+                         column(6, div(style = "background-color: #cce2f5c5; padding: 1px; border-radius: 2px;",
                                        tableOutput('vcfFileInfo'))) 
                          ),
                 fluidRow(column(12, 
@@ -217,6 +217,7 @@ ui <- dashboardPage(
                                         )
                                     ),
                                     tabPanel("BAM Viewer",
+                                        fluidRow( column(12, )),
                                         fluidRow(
                                                       column(3, selectInput("variantList", "Selected Variants",
                                                                             choices = c(""))),
@@ -278,7 +279,7 @@ server <- function(input, output, session) {
       class = "display nowrap compact", # style
       filter = "top" # location of column filters
     )
-    
+
   })
   
   ## lists of important genes to highlight in the table
@@ -372,44 +373,15 @@ server <- function(input, output, session) {
   #observeEvent(input$bam_dir, {
   #})
 
-  #-----------------------------------------------------------------------------
-  #  generate variant dataframe
-  #-----------------------------------------------------------------------------
-  inputTable <- reactive({
+  # read in the vcf file
+  get_vcf <- reactive({
+    print("Reading vcf file...")
     
-    print("Getting input data frame")
-
-    #vcfpath <- get_vcf_dir()
-    #bampath <- get_bam_dir()
-    #req(input$samplesheet)
-    
-    #sampleSheet <- get_samplesheet()
-    #vcfpath <- get_vcf_dir()
-    
-    #print(paste("samplesheet:", global$sampleSheet))
-    #print(paste("vcfpath:", global$vcfDir))
-    
-    # if (is.integer(input$vcf_dir)) { # no selection made
-    #   vcfpath <- vcfDir_default
-    #   output$vcfDir <- renderText(vcfDir_default)
-    # } else {
-    #   vcfpath <- get_vcf_dir()
-    # }
-    
-    studyID <- input$studyID
-    subjID <- input$subjectID
-    caller <- input$caller
-    sampleID <- input$sampleID
-    
-    #filterLevel <- input$filterLevel # region, population, mutation, driver, genes of interest
-    
-    #inputDir <- paste0(global$vcfDir, caller) # sep = "/"
     inputDir <- "sbgenomics/project-files/"
     print(inputDir)
 
     inFile <- "NULL"
     
-    #filterName <- filterNames[filterLevel]
     infile_df <- df_manifest() |> filter(StudyID==input$studyID) |>
                                   filter(ParticipantID==input$participantID) |>
                                   filter(SampleID==input$sampleID) |>
@@ -418,11 +390,9 @@ server <- function(input, output, session) {
                                   #filter(TumorNormal==input$TumorNormal)
     
     # select infile from manifest df
-    #infile_df <- manifest |> filter(StudyID == studyID, ParticipantID == subjID, 
-    #                             SampleID == sampleID, Caller == caller) |> select(VCFFileName)
     inFile <- paste0(inputDir, input$vcfFile)
     
-    # TODO: check VCF file size - if GB, print warning that only 100k(?) lines will be read in, 
+    # check VCF file size - if GB, print warning that only 100k(?) lines will be read in, 
     # suggest filtering VCF first
     get_vcf_file_size <- function(size) {
       x <- unlist(strsplit(size, " "))
@@ -441,12 +411,13 @@ server <- function(input, output, session) {
                  type = "warning")
     }
     
-    #req(inFile)
     validate(
         need(file.exists(inFile),
              paste("Error: The required file", inFile, "is not in the working directory.")
         )
     )
+
+    # Read in VCF file
     print(paste("Reading vcf file: ", inFile))
     vcf <- read.vcfR(inFile, checkFile = TRUE)
       # Note: using nrows = 100000L creates a dataframe with 100,000 rows even if
@@ -455,6 +426,20 @@ server <- function(input, output, session) {
       # df_filtered <- df %>%
       #  filter(!if_all(everything(), is.na))
     print(paste("vcf dimensions: ", dim(vcf)))
+
+    return(list(vcf = vcf, infile_df = infile_df)) # returns S4 object from vcfR
+  })
+
+  #-----------------------------------------------------------------------------
+  #  generate variant dataframe
+  #-----------------------------------------------------------------------------
+  inputTable <- reactive({
+    
+    print("Getting input data frame")
+    
+    vcf_info <- get_vcf()
+    vcf <- vcf_info$vcf
+    infile_df <- vcf_info$infile_df
 
     # check that we have variants
     #  - getFIX returns a character vector if there is 1 variant, dataframe otherwise
@@ -475,9 +460,7 @@ server <- function(input, output, session) {
                                                SampleTumorStatus, Sample.Diagnosis) |>
                                  dplyr::rename(Anatomic_Site = Sample.Anatomic.Site, Age_in_days = Age.at.Sample.Collection.days,
                                                Status = SampleTumorStatus, Diagnosis = Sample.Diagnosis)
-    Num_Variants <- c(numVariants)
-    numVardf <- data.frame(Num_Variants)
-    infile_df <- cbind(numVardf, vcfInfoTable)
+    infile_df <- cbind(data.frame(numVariants, vcfInfoTable))
     output$vcfFileInfo <- renderTable({ infile_df }, bordered = TRUE)
     
     # mutect2 FORMAT:
@@ -669,9 +652,9 @@ server <- function(input, output, session) {
       show_cols = dput(TEMP, file="tmp.txt") # add quotes
       
       # get the sampleIDs 
-      gt <- vcf@gt
-      #print(colnames(gt))
-      #[1] "FORMAT"      "BS_A1DV9T7G" "BS_GJWAV3E5"
+      # gt <- vcf@gt
+      # print(colnames(gt))
+      # [1] "FORMAT"      "BS_A1DV9T7G" "BS_GJWAV3E5"
       show_cols <- append(show_cols, colnames(vcf@gt))
       
       # get columns with genes of interest
@@ -816,62 +799,73 @@ server <- function(input, output, session) {
   #-----------------------------------------------------------------------------#
 
   observeEvent(input$dataTable_rows_selected, {
-    x <- inputTable()$df[input$dataTable_rows_selected, ]
-    print(dim(x))
-    # Can use character(0) to remove all choices
-    if (is.null(x))
-      x <- character(0)
     
+    req(inputTable()$df, input$dataTable_rows_selected)
+    
+    x <- inputTable()$df[input$dataTable_rows_selected, ]
+    print(paste("rows selected:",dim(x)))
+    
+    # Handle empty selection safely
+    if (nrow(x) == 0) {
+      choices_vector <- character(0)
+    } else {
+      # Extract the actual values as a vector, not a data frame
+      choices_vector <- x[["index"]]
+    }
     # Update the selectInput menu
-    updateSelectInput(session, "variantList", "Selected Variants", choices = x["index"]) # selected = c("")
+    updateSelectInput(session, "variantList", "Selected Variants", choices = choices_vector, selected = character(0)) 
     
   })
   
   observeEvent(input$variantList, {
     
-    req(input$variantList)
+    #req(input$variantList)
+
+    vcf_info <- get_vcf()
+    vcf <- vcf_info$vcf
+    infile_df <- vcf_info$infile_df
+
+    #output$bamDir <- renderText(global$bamDir)
+    # need to get bam/cram file name from input$vcfFile
+    infile_df <- df_manifest() |> filter(StudyID==input$studyID) |>
+                                  filter(ParticipantID==input$participantID) |>
+                                  filter(SampleID==input$sampleID) |>
+                                  filter(caller==input$caller)
     
-    if (Sys.info()['nodename'] == "NCI-02295810-ML") {
-      # Posit::Connect server
-      # -> The Biowulf file system is mounted at /mnt/BW-Data/ on appshare-dev
-      bampath <- "/mnt/BW-Data/recalibrated/"
-    }
-    
-    if (Sys.info()['nodename'] == "NCI-02295810-ML") {
-      global$bamDir <- "/Volumes/sierk/runx/nf/sarek/sarek_april2025/preprocessing/recalibrated/"
-    } 
-    output$bamDir <- renderText(global$bamDir)
-    
+    bamFile <- NULL
+    cramFile <- NULL
+    bamFile <- infile_df$BAMFileName[match(input$vcfFile, infile_df$VCFFileName)]
+    cramFile <- infile_df$CRAMFileName[match(input$vcfFile, infile_df$VCFFileName)]
+
     x <- inputTable()$df
-    variant <- x[x$index == input$variantList, ] # input$variantList
+    variant <- x[x$index == input$variantList, ] 
     chrom_pos <- paste0(variant$CHROM, ":", variant$POS)
     showGenomicRegion(session, id="igvShiny_0", chrom_pos) # chr21:10,397,614-10,423,341
     
-    # TODO: need to get rid of FPD_ hardcoding
-    samples <- variant |> select(all_of(starts_with("FPD_"))) # FPD_0028_FPD_0028_SK211E
-    #print(samples)
-    sample_names <- colnames(samples)
-    
-    for (s in sample_names) {
-      print(s)
-      sampleID <- substr(s,10,24)
-      print(paste0("sampleID: ", sampleID))
+    for (s in colnames(vcf@gt)[-1]) {
+
+      print(paste0("sampleID: ", s))
       
-      subjID <- input$subjectID
-      bamFile <- paste0(global$bamDir, sampleID, "/", sampleID, ".recal.bam")
-      #bamFile <- "/Volumes/sierk/runx/nf/sarek_august2024/preprocessing/recalibrated/FPD_0271_BM221E/FPD_0271_BM221E.recal.bam"
-      if (file.exists(bamFile)) {
-        output$bamfile <- renderText({paste("loading bam file:", bamFile)})
-        x <- readGAlignments(bamFile, param = Rsamtools::ScanBamParam(what="seq", which=GRanges(chrom_pos)))
-        loadBamTrackFromLocalData(session, id="igvShiny_0", trackName=sampleID, data=x)
+      # Use bamfile if it exists; if not, then use cram file
+      if (!is.null(bamFile)) {
+        if (file.exists(bamFile)) {
+          output$bamfile <- renderText({paste("loading bam file:", bamFile)})
+          #x <- readGAlignments(bamFile, param = Rsamtools::ScanBamParam(what="seq", which=GRanges(chrom_pos)))
+          #loadBamTrackFromLocalData(session, id="igvShiny_0", trackName=s, data=x)
+        } else {
+          output$bamfile <- renderText({ paste("<font color=\"#FF0000\"><b>", "bam file missing: ", "</b></font>", bamFile) })
+        }
+      } else if (!is.null(cramFile)) {
+        if (file.exists(cramFile)) {
+          output$bamfile <- renderText({paste("loading cramfile:", cramFile)})
+          #loadCramTrackFromLocalData(session, id="igvShiny_0", trackName=s, cramFile)
+        } else {
+          output$bamfile <- renderText({paste("<font color=\"#FF0000\"><b>", "cram file missing: ", "</b></font>", cramFile) })
+        }
       } else {
-        output$bamfile <- renderText({ paste("<font color=\"#FF0000\"><b>", "bam file missing: ", "</b></font>", bamFile) })
+        print("No BAM or CRAM file available.")
       }
     }
-
-    #bamFileDisplay <- paste0(bamDir, "\n", sampleID, "/", sampleID, ".recal.bam")
-    #output$bamfile <- renderText(bamFileDisplay)
-
   }, ignoreInit = TRUE) # don't display until user clicks on dropdown menu
   
   # from igvShinyDemo, potentially useful:
