@@ -179,14 +179,44 @@ ui <- dashboardPage(
                         tabBox( title = "",
                                 id = "main",
                                 width = 12,
-                                    tabPanel("README",
-                                         htmlOutput("readme")
+                                    tabPanel("Instructions",
+                                         htmlOutput("instructions")
                                     ),
                                     tabPanel("Input Manifest",
                                         div(withSpinner(dataTableOutput("manifestTable")))
                                     ),
                                     tabPanel("Table",
-                                        div(withSpinner(dataTableOutput("dataTable")))
+                                          fluidRow(column(1,
+                                                    actionButton(inputId = "render_table", label = "Load Table", icon = icon("table"))),
+                                                  column(5,
+                                                    box(
+                                                        title = "Filtering Options", width = 12,
+                                                        collapsible = TRUE, collapsed = TRUE,
+                                                        fluidRow(column(3, 
+                                                          radioButtons(
+                                                            inputId = "mutationFilter",
+                                                            label   = "Mutation Filter:",
+                                                            choices = c("Significant" = "significant", 
+                                                                        "Less Significant" = "less_significant",
+                                                                        "None" = "none"),
+                                                            selected = "significant", inline = FALSE
+                                                          )
+                                                        ),
+                                                        column(4,
+                                                          numericInput(
+                                                            inputId = "allele_freq_cutoff",
+                                                            label   = "Enter max allele frequency (0.01-0.99):",
+                                                            value = 1.00,
+                                                            min = 0.01,
+                                                            max = 0.99,
+                                                            step = 0.01, 
+                                                            updateOn = "blur", 
+                                                            width = "150px"
+                                                          )
+                                                        )) # fluidRow
+                                                      ) # box
+                                            )), # fluidRow
+                                          div(withSpinner(dataTableOutput("dataTable")))
                                     ),
                                     tabPanel(title = "Legends",
                                         div (
@@ -430,10 +460,14 @@ server <- function(input, output, session) {
     return(list(vcf = vcf, infile_df = infile_df)) # returns S4 object from vcfR
   })
 
+  # avoid refreshing table until finished typing
+  allele_freq_cutoff <- reactive({ input$allele_freq_cutoff }) |> debounce(1000) 
+
   #-----------------------------------------------------------------------------
   #  generate variant dataframe
   #-----------------------------------------------------------------------------
-  inputTable <- reactive({
+  
+  inputTable <- eventReactive(input$render_table, {
     
     print("Getting input data frame")
     
@@ -528,16 +562,14 @@ server <- function(input, output, session) {
                                                            too_many = "debug", too_few = "debug", names_repair = "universal")
     # too_many = "debug", too_few = "debug",
 
-    #### filter based on population frequency
-    # Default: MAX_AF
-    # TODO: allow user to select field instead of MAX_AF
-    # pop_freq_cutoff (default 0.01)
-    pop_freq_cutoff <- 1
-    my.vcf.ANN.df <- my.vcf.ANN.df |> mutate(across(matches(c("gnomAD", "_AF")), \(x) {
+    #### filter based on gnomAD population frequency
+    # TODO: allow user to select field(s) to filter on
+    print(paste("freq cutoff: ", input$allele_freq_cutoff))
+    my.vcf.ANN.df <- my.vcf.ANN.df |> mutate(across(matches(c("gnomad", "_AF")), \(x) {
                                               x <- ifelse(x == ".", NA, x) # Replace VCF dots with true NA
                                               as.numeric(x)
-                                              })) 
-                                   # |> filter(gnomAD_AF <= pop_freq_cutoff)
+                                              })) |> 
+                                      dplyr::filter(gnomad_3_1_1_AF <= allele_freq_cutoff() | is.na(gnomad_3_1_1_AF))
     
     #### filter based on mutation severity
     significant_mutation_list = c("start_lost", "stop_lost", "stop_gained", "missense_variant",
@@ -551,14 +583,19 @@ server <- function(input, output, session) {
                                        "3_prime_UTR_variant",
                                        "synonymous_variant")
     
-    # TODO: user selects mutation_filter (default "significant")
-    mutation_filter = "significant"
-    if (mutation_filter == "less_significant") {
-      mutation_list = c(significant_mutation_list, less_significant_mutation_list)
-    } else {
-      mutation_list = significant_mutation_list
+    # filter based on mutation severity (default = "significant")
+    print(paste("mutationFilter: ", input$mutationFilter))
+    if (input$mutationFilter == "significant" | input$mutationFilter == "less_significant") {
+      print("filtering based on mutation")
+      if (input$mutationFilter == "less_significant") {
+        print("less significant")
+        mutation_list = c(significant_mutation_list, less_significant_mutation_list)
+      } else if (input$mutationFilter == "significant") {
+        mutation_list = significant_mutation_list
+        print("significant")
+      }
+      my.vcf.ANN.df <- my.vcf.ANN.df |> filter(Consequence %in% mutation_list)
     }
-    my.vcf.ANN.df <- my.vcf.ANN.df |> filter(Consequence %in% mutation_list)
     
     #### create an index from chr,pos,ref,alt
     my.vcf.ANN.df$index <- paste(my.vcf.ANN.df$CHROM, my.vcf.ANN.df$POS, my.vcf.ANN.df$REF, my.vcf.ANN.df$ALT, sep='.')
@@ -572,7 +609,7 @@ server <- function(input, output, session) {
       mutate(AA2 = str_extract(Amino_acids, "/(\\w+$)", group=1)) |>
       mutate(AA_mut = case_when(Consequence == "missense_variant" | Consequence == "frameshift_variant" 
                                 ~ paste0(AA1, prot_pos, AA2))) |>
-      select(!prot_pos, !AA1, !AA2)
+      select(-prot_pos, -AA1, -AA2)
       
     #### Extract 1 value from predictors that give values for each transcript:
     # PROVEAN_pred, PolyPhen2_HDIV_pred, PolyPhen2_HVAR_pred, REVEL_score
@@ -785,7 +822,7 @@ server <- function(input, output, session) {
   })
 
   # Instructions 
-  output$readme <- renderUI({
+  output$instructions <- renderUI({
     tags$iframe(
       seamless="seamless",
       src="html_assets/Instructions.html",
@@ -1014,42 +1051,8 @@ shinyApp(ui, server) # launch.browser = TRUE, options = list(width = 1600)
 
 ####----------------------- Notes ---------------------------####
 
-# Workaround for reading in cram files:
-# (from https://github.com/gladkia/igvShiny/issues/102)
-# 
-# Install the servr package if you don't have it already:
-# 
-# Start a local web server: In your R console, run the following command, replacing "path/to/your/files" with the actual path to the directory containing your CRAM and CRAI files:
-#   
-#   servr::httd(dir = "path/to/your/files")
-# This will start a local web server, usually at http://127.0.0.1:4321.
-# 
-# Note: inside Docker, do this (https://github.com/yihui/servr/issues/49):
-# 
-#   deamon_id <- servr::httd(port = 8001, daemon = TRUE, host = '0.0.0.0')
-#   cramURL <- "http://0.0.0.0:8001/your_file.cram"
-#
-# Load the CRAM track in igvShiny: In your Shiny app, you can now use loadCramTrackFromURL, 
-# providing the local URLs for your CRAM and CRAI files.
-# 
-# # In your Shiny server function
-# ...
-# session <- shiny::getDefaultReactiveDomain()
-# 
-# trackName <- "Local CRAM"
-# cramURL <- "http://127.0.0.1:4321/your_file.cram"
-# indexURL <- "http://127.0.0.1:4321/your_file.cram.crai"
-# 
-# loadCramTrackFromURL(session,
-#                      trackName=trackName,
-#                      trackColor="blue",
-#                      dataURL=cramURL,
-#                      indexURL=indexURL)
-# ...
-# Remember to replace "your_file.cram" with the name of your CRAM file.
-
-
-# You need to add "l" (small letter "L") to dom, that makes Blfrtip:
+# DT options
+# Blfrtip:
 # B - Buttons
 # l - Length changing input control
 # f - Filtering input
@@ -1057,5 +1060,5 @@ shinyApp(ui, server) # launch.browser = TRUE, options = list(width = 1600)
 # t - Table
 # i - Table information summary
 # p - Pagination control
-#
+
 
