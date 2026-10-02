@@ -1,0 +1,244 @@
+# ============================================================
+# 3DVizSNP Shiny Tab
+# Wraps the python functions from https://github.com/CBIIT-CGBB/3DVizSNP
+# via reticulate, and displays an embedded iCn3D viewer + DT table.
+# 10/2/26 first draft written by Claude 
+# ============================================================
+
+library(shiny)
+library(reticulate)
+library(DT)
+library(htmltools)
+
+# from argparse import ArgumentParser, HelpFormatter
+# import textwrap
+# import sys
+# import os.path
+# import re
+# from pysam import VariantFile
+# import requests # verify=False set in requests to avoid errors when on VPN
+# requests.packages.urllib3.disable_warnings() # removes InsecureRequestWarning due to verify=False being set
+# import json
+# import time
+# from datetime import datetime
+# from urllib.parse import quote 
+# #from urllib.request import urlopen 
+# import pandas as pd
+
+# import re
+# from pysam import VariantFile
+# import json
+# from urllib.parse import quote 
+# #from urllib.request import urlopen 
+# import pandas as pd
+# py_require("re")    # Declare jax is a requirement
+# py_require("pysam")
+# py_require("json")
+# py_require("urllib")
+# py_require("pandas")
+
+# re <- import("re") 
+# json <- import("json")
+# urllib <- import("urllib")
+# pd <- import("pandas")
+# pysam <- import("pysam")
+# VariantFile <- pysam$VariantFile
+# 4. Use it just like you would in Python
+# bcf_in <- VariantFile("test.bcf")
+
+# ------------------------------------------------------------------
+# 1) Configure Python Path
+# ------------------------------------------------------------------
+VIZSNP_REPO_PATH <- "python"                 
+VIZSNP_PY_FILE   <- file.path(VIZSNP_REPO_PATH,
+                               "3DVizSNP.py")  
+                                                        
+
+ICN3D_BASE_URL <- "https://www.ncbi.nlm.nih.gov/Structure/icn3d/full.html"
+
+# ------------------------------------------------------------------
+# 2) SOURCE THE PYTHON FUNCTIONS INTO R
+#    reticulate::source_python() turns each `def` into an R function
+#    with matching argument names, so names(formals(fn)) works below.
+# ------------------------------------------------------------------
+reticulate::source_python(VIZSNP_PY_FILE, envir = globalenv())
+
+REQUIRED_FUNCS <- c("get_protein_id", "get_pdb_num", "check_mutant",
+                     "check_observed", "get_pdb_id", "variant_string",
+                     "get_iCn3D_path")
+
+# Sanity check + print each function's real argument names so you can
+# confirm/adjust context_from_row() and call_flexible() below.
+for (fn_name in REQUIRED_FUNCS) {
+  if (!exists(fn_name, mode = "function")) {
+    stop(sprintf("Function '%s' was not found after sourcing %s. ",
+                  fn_name, VIZSNP_PY_FILE),
+         "Check VIZSNP_PY_FILE points to the right source file.")
+  }
+  message(fn_name, "(", paste(names(formals(get(fn_name))), collapse = ", "), ")")
+}
+
+# ------------------------------------------------------------------
+# 3) FLEXIBLE DISPATCH: call a python function using only the named
+#    arguments it actually declares, pulled from a shared context list.
+#    This avoids hardcoding positional order we can't verify.
+# ------------------------------------------------------------------
+call_flexible <- function(fn, context) {
+  needed <- names(formals(fn))
+  needed <- needed[needed %in% names(context)]
+  do.call(fn, context[needed])
+}
+
+# ------------------------------------------------------------------
+# 4) MAP A ROW OF my.vcf.df INTO A NAMED CONTEXT
+#    ADJUST THE RIGHT-HAND SIDES to match your actual column names.
+# ------------------------------------------------------------------
+context_from_row <- function(row) {
+  list(
+    chrom            = row[["CHROM"]],
+    pos              = row[["POS"]],
+    ref              = row[["REF"]],
+    alt              = row[["ALT"]],
+    gene             = row[["Gene"]],
+    transcript_id    = row[["Feature"]],
+    protein_position = row[["Protein_position"]],
+    amino_acids      = row[["Amino_acids"]],
+    sift             = row[["SIFT"]],
+    polyphen         = row[["PolyPhen"]]
+  )
+}
+
+# ------------------------------------------------------------------
+# 5) RUN THE 3DVizSNP PIPELINE FOR ONE VARIANT ROW
+#    Each step's output is folded back into the context so later
+#    functions (e.g. get_iCn3D_path) can use protein_id / pdb_id / etc.
+# ------------------------------------------------------------------
+process_variant <- function(row) {
+  ctx <- context_from_row(row)
+
+  safe_call <- function(fn, ctx) {
+    tryCatch(call_flexible(fn, ctx), error = function(e) NA)
+  }
+
+  ctx$protein_id <- safe_call(get_protein_id, ctx)
+  ctx$pdb_id     <- safe_call(get_pdb_id, ctx)
+  ctx$pdb_num    <- safe_call(get_pdb_num, ctx)
+
+  mutant_ok   <- safe_call(check_mutant, ctx)
+  observed_ok <- safe_call(check_observed, ctx)
+  var_str     <- safe_call(variant_string, ctx)
+  icn3d_path  <- safe_call(get_iCn3D_path, ctx)
+
+  data.frame(
+    Gene        = ifelse(is.null(ctx$gene), NA, ctx$gene),
+    Variant     = ifelse(is.null(var_str), NA, var_str),
+    ProteinID   = ifelse(is.null(ctx$protein_id), NA, ctx$protein_id),
+    PDB_ID      = ifelse(is.null(ctx$pdb_id), NA, ctx$pdb_id),
+    PDB_Num     = ifelse(is.null(ctx$pdb_num), NA, ctx$pdb_num),
+    MutantMatch = ifelse(is.null(mutant_ok), NA, mutant_ok),
+    Observed    = ifelse(is.null(observed_ok), NA, observed_ok),
+    SIFT        = ifelse(is.null(ctx$sift), NA, ctx$sift),
+    PolyPhen    = ifelse(is.null(ctx$polyphen), NA, ctx$polyphen),
+    iCn3D_Path  = ifelse(is.null(icn3d_path), NA, icn3d_path),
+    stringsAsFactors = FALSE
+  )
+}
+
+build_variant_table <- function(vcf_df, progress_fn = NULL) {
+  n <- nrow(vcf_df)
+  out <- vector("list", n)
+  for (i in seq_len(n)) {
+    out[[i]] <- process_variant(vcf_df[i, , drop = FALSE])
+    if (!is.null(progress_fn)) progress_fn(i, n)
+  }
+  do.call(rbind, out)
+}
+
+# ------------------------------------------------------------------
+# 6) SHINY MODULE: UI
+# ------------------------------------------------------------------
+viz3dsnp_tab_ui <- function(id = "viz3dsnp") {
+  ns <- NS(id)
+  tabPanel(
+    "3DVizSNP",
+    fluidRow(
+      column(12,
+        actionButton(ns("build_btn"), "Build 3D Visualization Table",
+                     class = "btn-primary"),
+        br(), br()
+      )
+    ),
+    fluidRow(
+      column(12,
+        div(style = "height: 520px; border: 1px solid #ddd;",
+            uiOutput(ns("icn3d_frame"))
+        )
+      )
+    ),
+    hr(),
+    fluidRow(
+      column(12,
+        DTOutput(ns("variant_table"))
+      )
+    )
+  )
+}
+
+# ------------------------------------------------------------------
+# 7) SHINY MODULE: SERVER
+# ------------------------------------------------------------------
+viz3dsnp_tab_server <- function(id, vcf_df) {
+  moduleServer(id, function(input, output, session) {
+
+    variant_table <- eventReactive(input$build_btn, {
+      withProgress(message = "Mapping variants to PDB/AlphaFold structures...",
+                   value = 0, {
+        build_variant_table(vcf_df, progress_fn = function(i, n) {
+          setProgress(value = i / n, detail = sprintf("%d / %d", i, n))
+        })
+      })
+    })
+
+    output$variant_table <- renderDT({
+      req(variant_table())
+      display_df <- variant_table()
+      display_df <- display_df[ , setdiff(names(display_df), "iCn3D_Path"),
+                                 drop = FALSE]
+      datatable(display_df, selection = "single", rownames = FALSE)
+    })
+
+    output$icn3d_frame <- renderUI({
+      req(variant_table())
+      sel <- input$variant_table_rows_selected
+      if (length(sel) == 0) {
+        return(div(style = "padding: 20px; color: #888;",
+                    "Select a row in the table below to load its structure."))
+      }
+      path <- variant_table()[sel, "iCn3D_Path"]
+      if (is.null(path) || is.na(path) || path == "") {
+        return(div(style = "padding: 20px; color: #888;",
+                    "No iCn3D structure available for this variant."))
+      }
+      full_url <- if (grepl("^https?://", path)) path else paste0(ICN3D_BASE_URL, path)
+      tags$iframe(src = full_url, width = "100%", height = "500px",
+                  style = "border: none;")
+    })
+  })
+}
+
+# ------------------------------------------------------------------
+# 8) EXAMPLE STANDALONE APP (remove this section if inserting the
+#    tab into an app you already have — just call viz3dsnp_tab_ui()
+#    inside your navbarPage/tabsetPanel and viz3dsnp_tab_server()
+#    inside your server function).
+# ------------------------------------------------------------------
+ui <- navbarPage(
+  "My Variant App",
+  viz3dsnp_tab_ui("viz3dsnp")
+)
+
+server <- function(input, output, session) {
+  viz3dsnp_tab_server("viz3dsnp", my.vcf.df)
+}
+
+shinyApp(ui, server)

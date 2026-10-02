@@ -1,5 +1,5 @@
 # VCF Table Viewer - CCDI & CGC Platform
-# October 2025 
+# October 2026 
 
 library(shiny) 
 library(shinydashboard)
@@ -25,51 +25,15 @@ library(GenomicAlignments)
 
 ####------------------- Customization --------------------####
 
-
 # global <- reactiveValues(sarekDir = "./",  
 #                          vcfDir = "./sbgenomics/project-files/", 
 #                          bamDir = "/mnt/BW-Data/recalibrated/")
 
 # Manifest file with the following headers:
-#VCFFileName, caller, ParticipantID, SampleID, BAMFileName (optional), StudyID (optional)
-#manifest <- read.csv("sbgenomics/project-files/CCDI_Manifest_Example.csv")
-#manifest <- manifest |> arrange(StudyID, ParticipantID, SampleID)
-#  VCFFileName, caller, ParticipantID, SampleID, BAMFileName (optional), StudyID (optional)
-#  manifest <- read.csv("sbgenomics/project-files/CCDI_Manifest_Example.csv")
-#  manifest <- manifest |> arrange(StudyID, ParticipantID, SampleID)
-# get caller column from file names
-# manifest <- manifest |> mutate(caller = str_select(FileName))
-#  a6a77776-f50a-4630-bdcf-631b7e7e51d0.vardict_somatic.norm.annot.public.vcf.gz
-#  65377817-5b14-4314-a87b-5eb4bae3757c.mutect2_somatic.norm.annot.public.vcf.gz
-#  9bf1f6d4-29c9-4f68-88e1-4246d9ce16e0.consensus_somatic.norm.annot.public.vcf.gz
-#  cc060cd2-3f50-4e33-95bb-27d81619d808.lancet_somatic.norm.annot.public.vcf.gz
-#  5d9a45fe-a6ed-4619-8a2b-aa69614e8e03.strelka2_somatic.norm.annot.public.vcf.gz
-
-## Dropdown items
-# study_list <- unique(manifest$StudyID)
-# subject_list <- unique(manifest$ParticipantID)
-# sample_list <- unique(manifest$SampleID)
-
-# list of callers
-#  callers <- c("consensus", "strelka2", "mutect2", "lancet", "vardict")
-#  callers <- unique(manifest$Caller)
-
-# list of filtering levels
-# Left out due to size constraints:
-#  - Annotation: full annotated VCF produced by sarek
-#  - Region: filter VCF by GIAB mappable region
 # 
-# 1. Population:        filter by population allele frequency < 0.01
-# 2. Mutation:          filter by significant mutations
-# 3. ML Driver Genes:   filter by myeloid cancer driver genes
-# 4. Genes of Interest: filter all genes of interest out of region-filtered VCF
-# filters <- c("Population", "Mutation", "ML Driver Genes", "Genes of Interest")
-# filterNames <- c("ann.rtgfilt.popfilt", "ann.rtgfilt.popfilt.sigmut", 
-#                  "ann.rtgfilt.popfilt.sigmut.genesmut", "ann.rtgfilt.allgenes")
-# names(filterNames) <- filters
-
-
-
+# VCFFileName (req) FileDescription	VCFFileSize	FileAccess	StudyID (req)	ParticipantID	(req) SampleID (req)	LibraryStrategy	
+# ParticipantIDCheck	BAMFileName	BAMFileSize	CRAMFileName	CRAMFileSize	caller	Sample.Anatomic.Site	
+# Age.at.Sample.Collection.days	SampleTumorStatus	Sample.Tumor.Classification	Sample.Diagnosis	Diagnosis.Category
 #--------------------------------------------------------------
 
 
@@ -77,7 +41,6 @@ library(GenomicAlignments)
 ####-----------------------Utilities----------------------####
 
 # needed for reading in the legend HTML files 
-# addResourcePath("tmpuser", getwd()) 
 addResourcePath(prefix = "html_assets", directoryPath = "html")
 
 printf <- function(...) print(noquote(sprintf(...))) # used with igvShiny
@@ -117,19 +80,21 @@ ui <- dashboardPage(
            verbatimTextOutput("fileDir", placeholder = TRUE),
            hr(style = "border-top: 1px solid #ccc; margin: 10px 0;"), # Add a styled horizontal rule
            
+           radioButtons(
+                        inputId = "manifestFile",
+                        label   = "Manifest File:",
+                        choices = c("Example" = "example", 
+                                    "Full CCDI" = "full_ccdi",
+                                    "Custom" = "custom"),
+                        selected = "example", inline = FALSE
+                       ),
            p("Load the manifest file.
              (Default: VCF_Table_Viewer_CCDI_manifest.csv in the data directory. 
               Required columns: VCFFileName, StudyID, ParticipantID, SampleID, caller)"),
            fileInput("manifest", label = "Select a manifest file (.csv format):", 
                      accept = ".csv"),
-           #verbatimTextOutput("stylesheet_file", placeholder = TRUE),
            hr(style = "border-top: 1px solid #ccc; margin: 10px 0;"), # Add a styled horizontal rule
-           
-           #p("Specify the directory with the post-pipeline filtered VCF files."),
-           #shinyDirButton("vcf_dir", "Select the VCF file directory", "Select a folder", style="width:200px"), # 
-           #verbatimTextOutput("vcfDir", placeholder = TRUE),
-           #hr(style = "border-top: 1px solid #ccc; margin: 10px 0;"), # Add a styled horizontal rule
-           
+
            #p("Specify the directory with the BAM files. Default: preprocessing/recalibrated in the sarek output directory."),
            #shinyDirButton("bam_dir", "Select the BAM file directory", "Select a folder", style="width:200px"),
            #verbatimTextOutput("bamDir", placeholder = TRUE),
@@ -147,12 +112,7 @@ ui <- dashboardPage(
                               
       ), # dashboardSidebar
                 
-      dashboardBody(
-                # change menus to studyID, subjectID, sampleID, caller
-                # filters are Population:
-                #             Field: (default MAX_AF), value (default 0.01)
-                # and Mutation:
-                #             Field: (default significant), value (list)            
+      dashboardBody(           
                 fluidRow(column(2, selectInput("studyID", "Study",
                                                choices = NULL)),
                          column(2, selectInput("participantID", "Participant", 
@@ -277,19 +237,30 @@ server <- function(input, output, session) {
   # Get the VCF and BAM file directories
   # roots=c(wd='.', vol='/Volumes', mnt='/mnt')
   
-  # First we read in the manifest.  Then we populate the studyID dropdown with the available 
-  # studyIDs.  The user selects a participantID, then a sampleID, then a caller, and can 
-  # optionally select Sample Type (Tumor or Normal) and File Access (Open or Controlled - both will be shown if not selected)
+  # 1. First we read in the manifest.  
+  # 2. Then we populate the studyID dropdown with the available studyIDs.*  
+  # 3. The user selects a participantID, then a sampleID, then a caller, and can 
+  #    optionally select Sample Type (Tumor or Normal) and File Access (Open or Controlled - both will be shown if not selected)
+  # 4. VCF file menu is populated with the available vcf files to select from.
+  #
+  # * With full manifest we get the following warning:
+  #  Warning: The select input "participantID" contains a large number of options; consider using server-side selectize 
+  #  for massively improved performance. See the Details section of the ?selectizeInput help topic.
   
-  df_manifest <- reactive({   
-    if (is.null(input$manifest)) {
-      manifest_file <- "sbgenomics/project-files/VCF_Table_Viewer_CCDI_manifest_all_fields.csv"
-    } else { 
+  df_manifest <- reactive({
+    
+    if (input$manifestFile == "example") {
+      manifest_file <- "sbgenomics/project-files/Example_manifest.csv"
+    } else if (input$manifestFile == "full_ccdi") {
+            manifest_file <- "sbgenomics/project-files/VCF_Table_Viewer_CCDI_manifest_all_fields.csv"
+    } else if (input$manifestFile == "custom") {
       manifest_file <- input$manifest$datapath
     }
+
     read.csv(manifest_file, header=TRUE, sep=",")
   })
   
+  # display the input manifest in a table
   output$manifestTable <- renderDT({
   
     dt <- DT::datatable(
@@ -304,8 +275,8 @@ server <- function(input, output, session) {
         lengthMenu = list(c(50, 100, -1), c('50','100','All')),
         autoWidth = TRUE,
         scrollX = TRUE
-        #searchCols = list(filter_list)  # initialize filters on each column
-      ), # options
+        
+      ), 
       class = "display nowrap compact", # style
       filter = "top" # location of column filters
     )
@@ -322,16 +293,19 @@ server <- function(input, output, session) {
     updateSelectInput(session, "genes_to_highlight", choices = colnames(genes))
   })
 
+  # populate the dropdown menus
   ccdi_study <- reactive({
     req(df_manifest())
-    unique(df_manifest() %>% pull(StudyID)) 
+    unique(df_manifest() |> pull(StudyID)) 
   })
   
   ccdi_participant <- reactive({
     req(df_manifest())
     req(input$studyID)
-    unique(df_manifest() %>% filter(StudyID==input$studyID) %>% 
-             pull(ParticipantID))
+    unique(df_manifest() |> 
+              filter(StudyID==input$studyID) |> 
+              pull(ParticipantID)
+         )
   })
   
   ccdi_sample <- reactive({
@@ -339,8 +313,10 @@ server <- function(input, output, session) {
     req(input$studyID)
     req(input$participantID)
 
-    unique(df_manifest() %>% filter(StudyID==input$studyID, ParticipantID==input$participantID) %>%
-                             pull(SampleID))
+    unique(df_manifest() |> filter(StudyID==input$studyID, 
+                                   ParticipantID==input$participantID) |>
+                            pull(SampleID)
+          )
   })
   
   ccdi_caller <- reactive({
@@ -349,32 +325,31 @@ server <- function(input, output, session) {
     req(input$participantID)
     req(input$sampleID)
     
-    unique(df_manifest() %>% filter(StudyID==input$studyID, 
-                                    ParticipantID==input$participantID,
-                                    SampleID==input$sampleID) %>%
-                             pull(caller))
+    unique(df_manifest() |> filter(StudyID==input$studyID, 
+                                   ParticipantID==input$participantID,
+                                   SampleID==input$sampleID) |>
+                            pull(caller)
+          )
   })
   
   ccdi_vcf_options <- reactive({
+
     req(df_manifest())
     req(input$studyID)
     req(input$participantID)
     req(input$sampleID)
     req(input$caller)
-    # caller
-    # FileAccess
+
+    unique(df_manifest() |> filter(StudyID==input$studyID) |>
+                            filter(ParticipantID==input$participantID) |>
+                            filter(SampleID==input$sampleID) |>
+                            filter(caller==input$caller) |>
+                            pull(VCFFileName))
     
-    unique(df_manifest() %>% filter(StudyID==input$studyID) %>%
-                             filter(ParticipantID==input$participantID) %>%
-                             filter(SampleID==input$sampleID) %>%
-                             #filter(FileAccess==input$fileAccess) %>%
-                             filter(caller==input$caller) %>%
-                             pull(VCFFileName))
+    # filter(SampleTumorStatus == input$sampleType) |>
+    # filter(FileAccess==input$fileAccess) |>
+
   })
-  #Warning: There was 1 warning in `filter()`.
-  # In argument: `caller == input$caller`.
-  #Caused by warning in `caller == input$caller`:
-  #  ! longer object length is not a multiple of shorter object length
   
   observe({
     updateSelectInput(session, "studyID", choices=ccdi_study())
@@ -453,7 +428,7 @@ server <- function(input, output, session) {
       # Note: using nrows = 100000L creates a dataframe with 100,000 rows even if
       # there are fewer variants than that in the file.
       # # Keep rows where NOT all values across ALL columns are NA
-      # df_filtered <- df %>%
+      # df_filtered <- df |>
       #  filter(!if_all(everything(), is.na))
     print(paste("vcf dimensions: ", dim(vcf)))
 
@@ -529,11 +504,6 @@ server <- function(input, output, session) {
     ##EAS_AF|EUR_AF|SAS_AF|AA_AF|EA_AF|gnomAD_AF|gnomAD_AFR_AF|gnomAD_AMR_AF|gnomAD_ASJ_AF|
     ##gnomAD_EAS_AF|gnomAD_FIN_AF|gnomAD_NFE_AF|gnomAD_OTH_AF|gnomAD_SAS_AF|CLIN_SIG|SOMATIC|PHENO|
     ##PUBMED|CHECK_REF|MOTIF_NAME|MOTIF_POS|HIGH_INF_POS|MOTIF_SCORE_CHANGE|TRANSCRIPTION_FACTORS">    
-    
-    #cols <- gsub(pattern='\\n',replacement="",x=cols)
-    #cols <- gsub(pattern='\\s',replacement="",x=cols)
-    #newcols <- strsplit(cols, "\\|")
-    #newcols <- unlist(newcols)
     
     # get columns from vcf file directly
     # ##INFO=<ID=CSQ
